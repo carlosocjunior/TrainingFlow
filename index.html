@@ -1,0 +1,2674 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrainingFlow</title>
+
+    <!-- Funções comuns entre as ferramentas do FlowSuite (escapeHtml, permissão,
+         tradução, cache por empresa, etc.) — precisa vir antes do script principal. -->
+    <script src="https://carlosocjunior.github.io/FlowSuite/shared.js"></script>
+
+    <!-- ExcelJS, FileSaver e Chart.js agora carregam sob demanda (ver carregarScript()),
+         só quando a pessoa clica em Exportar ou Dashboard, não no carregamento da página. -->
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0d1b2a;
+            padding: 30px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: linear-gradient(145deg, #1b263b, #0d1b2a);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            border: 1px solid #2c3e50;
+        }
+        h1 {
+            color: #48cae4;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(72, 202, 228, 0.3);
+        }
+        .subtitulo {
+            color: #8ab4d6;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .toolbar-left {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-weight: bold;
+        }
+        .btn:hover { opacity: 0.85; transform: scale(1.03); }
+        .btn-adicionar { background: linear-gradient(135deg, #00b4d8, #0077b6); color: white; }
+        .btn-exportar { background: linear-gradient(135deg, #06d6a0, #059669); color: white; }
+        .btn-importar { background: linear-gradient(135deg, #64748b, #475569); color: white; }
+        .btn-limpar { background: linear-gradient(135deg, #94a3b8, #64748b); color: white; }
+        .btn-sync { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; }
+        .btn-dashboard {
+            background: linear-gradient(135deg, #2C3E50, #1a2a3a);
+            color: #48cae4;
+            border: 1px solid #00b4d8;
+        }
+        .filtros {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border: 1px solid #2c3e50;
+        }
+        .filtros label { font-weight: bold; color: #8ab4d6; font-size: 13px; }
+        .filtros input, .filtros select {
+            padding: 8px 12px;
+            border: 1px solid #2c3e50;
+            border-radius: 5px;
+            font-size: 14px;
+            background: #1b263b;
+            color: #e0e0e0;
+            min-width: 150px;
+        }
+        .filtros input:focus, .filtros select:focus {
+            outline: 2px solid #00b4d8;
+            border-color: transparent;
+        }
+        .filtros input::placeholder { color: #6b7f94; }
+        .tabela-wrapper { overflow-x: auto; margin-top: 10px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        thead {
+            background: linear-gradient(135deg, #1a2a3a, #0d1b2a);
+            color: #48cae4;
+            border-bottom: 2px solid #00b4d8;
+        }
+        th {
+            padding: 12px 15px;
+            text-align: left;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+        td {
+            padding: 10px 15px;
+            border-bottom: 1px solid #1a2a3a;
+            vertical-align: middle;
+            color: #d4dce8;
+        }
+        tr.status-atencao { background: rgba(255, 193, 7, 0.15) !important; }
+        tr.status-atencao:hover { background: rgba(255, 193, 7, 0.25) !important; }
+        tr.status-inapto { background: rgba(220, 53, 69, 0.15) !important; }
+        tr.status-inapto:hover { background: rgba(220, 53, 69, 0.25) !important; }
+        tr.status-apto { background: transparent !important; }
+        tr.status-apto:hover { background: rgba(255,255,255,0.03) !important; }
+        .status-semaforo {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+            border: 1px solid rgba(0,0,0,0.2);
+        }
+        .status-verde { background-color: #28a745; box-shadow: 0 0 12px rgba(40, 167, 69, 0.4); }
+        .status-amarelo { background-color: #ffc107; box-shadow: 0 0 12px rgba(255, 193, 7, 0.4); }
+        .status-vermelho { background-color: #dc3545; box-shadow: 0 0 12px rgba(220, 53, 69, 0.4); }
+        .status-texto { font-weight: bold; vertical-align: middle; }
+        .status-texto.verde { color: #28a745; }
+        .status-texto.amarelo { color: #ffc107; }
+        .status-texto.vermelho { color: #dc3545; }
+        .data-verde { color: #28a745 !important; font-weight: bold; }
+        .data-amarelo { color: #ffc107 !important; font-weight: bold; }
+        .data-vermelho { color: #dc3545 !important; font-weight: bold; }
+        .data-cinza { color: #6b7f94 !important; }
+        .btn-acao {
+            padding: 5px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-weight: bold;
+        }
+        .btn-acao:hover { opacity: 0.8; transform: scale(1.05); }
+        .btn-editar { background: #ffc107; color: #1a1a2e; margin-right: 5px; }
+        .btn-excluir { background: #dc3545; color: white; }
+        .btn-registros { background: #00b4d8; color: white; }
+        .btn-registros:hover { background: #0096b8; }
+        .btn-drive { background: #0F9D58; color: white; }
+        .btn-drive:hover { background: #0b7e48; }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: linear-gradient(145deg, #1b263b, #0d1b2a);
+            padding: 35px 40px;
+            border-radius: 12px;
+            max-width: 700px;
+            width: 95%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+            border: 1px solid #2c3e50;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+        .modal h2 { margin-bottom: 20px; color: #48cae4; }
+        .modal .fechar {
+            position: absolute;
+            top: 12px;
+            right: 18px;
+            font-size: 28px;
+            cursor: pointer;
+            color: #6b7f94;
+            background: none;
+            border: none;
+        }
+        .modal .fechar:hover { color: #48cae4; }
+        .modal label {
+            display: block;
+            font-weight: bold;
+            margin-top: 12px;
+            margin-bottom: 4px;
+            font-size: 13px;
+            color: #8ab4d6;
+        }
+        .modal input, .modal select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #2c3e50;
+            border-radius: 5px;
+            font-size: 14px;
+            background: #0d1b2a;
+            color: #e0e0e0;
+        }
+        .modal input:focus, .modal select:focus {
+            outline: 2px solid #00b4d8;
+            border-color: transparent;
+        }
+        .modal input::placeholder { color: #6b7f94; }
+        .modal .btn-salvar {
+            margin-top: 20px;
+            background: linear-gradient(135deg, #00b4d8, #0077b6);
+            color: white;
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .modal .btn-salvar:hover { background: linear-gradient(135deg, #0096b8, #005f8a); }
+        .modal .linha-dupla { display: flex; gap: 15px; }
+        .modal .linha-dupla > div { flex: 1; }
+        .modal .secao-treinamentos {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px solid #2c3e50;
+        }
+        .modal .secao-treinamentos h4 {
+            color: #48cae4;
+            margin-bottom: 15px;
+            font-size: 15px;
+        }
+        .modal .treinamento-item {
+            background: rgba(255,255,255,0.03);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border-left: 3px solid #00b4d8;
+        }
+        .modal .treinamento-item label {
+            font-size: 12px;
+            margin-top: 4px;
+            margin-bottom: 2px;
+            color: #8ab4d6;
+        }
+        .modal .treinamento-item input {
+            font-size: 13px;
+            padding: 6px 10px;
+            margin-bottom: 2px;
+        }
+        .modal .treinamento-item .periodicidade-info {
+            font-size: 11px;
+            color: #6b7f94;
+            margin-top: 2px;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .contador {
+            font-size: 14px;
+            color: #8ab4d6;
+            margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .contador span { font-weight: bold; }
+        .contador .verde { color: #28a745; }
+        .contador .amarelo { color: #ffc107; }
+        .contador .vermelho { color: #dc3545; }
+        .sem-registros {
+            text-align: center;
+            padding: 40px;
+            color: #6b7f94;
+            font-size: 16px;
+        }
+        .sem-registros .icone { font-size: 48px; margin-bottom: 10px; }
+        .status-online {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-online.online {
+            background-color: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+            border: 1px solid #28a745;
+        }
+        .status-online.offline {
+            background-color: rgba(220, 53, 69, 0.2);
+            color: #dc3545;
+            border: 1px solid #dc3545;
+        }
+        .badge-treinamento {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            margin: 1px 2px;
+        }
+        .badge-verde {
+            background: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+            border: 1px solid #28a745;
+        }
+        .badge-amarelo {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            border: 1px solid #ffc107;
+        }
+        .badge-vermelho {
+            background: rgba(220, 53, 69, 0.2);
+            color: #dc3545;
+            border: 1px solid #dc3545;
+        }
+        .badge-pendente {
+            background: rgba(108, 117, 125, 0.2);
+            color: #adb5bd;
+            border: 1px solid #6c757d;
+        }
+        .dashboard-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+        }
+        .dashboard-modal.active { display: flex; }
+        .dashboard-container {
+            background: linear-gradient(145deg, #1b263b, #0d1b2a);
+            border-radius: 16px;
+            max-width: 1200px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 30px;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            border: 1px solid #2c3e50;
+        }
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        .dashboard-header h2 {
+            margin: 0;
+            color: #48cae4;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .dashboard-header h2 span {
+            background: #00b4d8;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        .btn-fechar-dashboard {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-fechar-dashboard:hover { background: #c82333; transform: scale(1.05); }
+        .dashboard-filtros {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            background: rgba(255,255,255,0.05);
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            align-items: center;
+            border: 1px solid #2c3e50;
+        }
+        .dashboard-filtros label {
+            font-weight: bold;
+            color: #8ab4d6;
+            font-size: 13px;
+        }
+        .dashboard-filtros input, .dashboard-filtros select {
+            padding: 8px 12px;
+            border: 1px solid #2c3e50;
+            border-radius: 5px;
+            font-size: 14px;
+            background: #1b263b;
+            color: #e0e0e0;
+            min-width: 150px;
+        }
+        .dashboard-filtros input:focus, .dashboard-filtros select:focus {
+            outline: 2px solid #00b4d8;
+            border-color: transparent;
+        }
+        .dashboard-filtros input::placeholder { color: #6b7f94; }
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-top: 20px;
+        }
+        .dashboard-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            border: 1px solid #2c3e50;
+            transition: 0.2s;
+        }
+        .dashboard-card:hover {
+            border-color: #00b4d8;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+        .dashboard-card h3 {
+            margin: 0 0 15px 0;
+            color: #48cae4;
+            font-size: 16px;
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2c3e50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .dashboard-card canvas { max-height: 250px; max-width: 100%; }
+        .dashboard-footer {
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 2px solid #2c3e50;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            color: #8ab4d6;
+            font-size: 14px;
+        }
+        .dashboard-footer .btn-exportar-graficos {
+            background: linear-gradient(135deg, #06d6a0, #059669);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .dashboard-footer .btn-exportar-graficos:hover { opacity: 0.85; transform: scale(1.05); }
+
+        @media (max-width: 768px) {
+            body { padding: 15px; }
+            .container { padding: 15px; }
+            .toolbar { flex-direction: column; align-items: stretch; }
+            .toolbar-left { flex-wrap: wrap; }
+            .filtros { flex-direction: column; align-items: stretch; }
+            .filtros input, .filtros select { width: 100%; min-width: unset; }
+            .modal { padding: 20px; }
+            .modal .linha-dupla { flex-direction: column; gap: 0; }
+            .btn { padding: 10px 15px; font-size: 13px; width: 100%; }
+            table { font-size: 12px; }
+            th, td { padding: 8px 10px; }
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .dashboard-container { padding: 15px; }
+            .dashboard-filtros { flex-direction: column; align-items: stretch; }
+            .dashboard-filtros input, .dashboard-filtros select { width: 100%; min-width: unset; }
+            .dashboard-header { flex-direction: column; align-items: stretch; gap: 10px; }
+            .dashboard-header h2 { font-size: 18px; }
+            .btn-fechar-dashboard { width: 100%; }
+        }
+
+        /* ===== STATUS DESLIGADO (CINZA ESCURO) ===== */
+        .status-cinza {
+            background-color: #4a4a4a !important;
+            box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
+            border: 1px solid #6c757d;
+        }
+        .status-texto.cinza {
+            color: #adb5bd !important;
+            font-weight: bold;
+        }
+        tr.status-desligado {
+            background: rgba(60, 60, 60, 0.25) !important;
+            border-left: 4px solid #4a4a4a;
+        }
+        tr.status-desligado:hover {
+            background: rgba(60, 60, 60, 0.40) !important;
+        }
+        .badge-cinza {
+            background: rgba(74, 74, 74, 0.3);
+            color: #adb5bd;
+            border: 1px solid #4a4a4a;
+        }
+        .status-semaforo.cinza {
+            background-color: #4a4a4a !important;
+            border: 1px solid #6c757d;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- CABEÇALHO -->
+    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 5px;">
+    <div style="font-family: Arial, sans-serif; line-height: 1.1; text-align: center; padding: 4px 12px; border-right: 2px solid #00b4d8;">
+        <div style="font-size: 22px; font-weight: 900; color: #00b4d8; letter-spacing: 1px;">SYNVORA</div>
+        <div style="font-size: 14px; font-weight: 700; color: #e0e0e0; letter-spacing: 2px;">LABS</div>
+        <div style="font-size: 9px; font-weight: 600; color: #8ab4d6; letter-spacing: 1px;">SMARTOPERATIONSPLATFORM</div>
+    </div>
+    <div>
+        <h1 id="tituloPagina" style="margin: 0;">TrainingFlow</h1>
+        <p class="subtitulo" style="margin-top: 5px;">
+<span id="statusConexao" class="status-online offline" data-i18n="verificandoConexao">Verificando conexão...</span>
+            <span data-i18n="subtitulo">Gerencie colaboradores, treinamentos e status em um só lugar.</span>
+        </p>
+    </div>
+</div>
+
+    <!-- BARRA DE FERRAMENTAS -->
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <button class="btn btn-adicionar" id="btnAdicionar" onclick="abrirModalAdicionar()" data-i18n="adicionarBtn">Adicionar</button>
+            <button class="btn btn-exportar" onclick="exportarDados()" data-i18n="exportarBtn">Exportar</button>
+            <button class="btn btn-importar" id="btnImportar" onclick="importarDados()" data-i18n="importarBtn">Importar</button>
+            <button class="btn btn-limpar" onclick="limparFiltros()" data-i18n="limparFiltrosBtn">Limpar Filtros</button>
+            <button class="btn btn-sync" onclick="sincronizarGoogleSheets()" data-i18n="sincronizarBtn">Sincronizar</button>
+            <button class="btn btn-dashboard" onclick="abrirDashboard()" data-i18n="dashboardBtn">Dashboard</button>
+        </div>
+    </div>
+
+    <!-- FILTROS -->
+    <div class="filtros">
+        <label for="filtroBusca" data-i18n="buscarLabel">Buscar:</label>
+        <input type="text" id="filtroBusca" placeholder="Nome ou registro..." data-i18n-placeholder="buscarPlaceholder" oninput="renderizarTabela()">
+
+        <label for="filtroStatus" data-i18n="statusLabel">Status:</label>
+        <select id="filtroStatus" onchange="renderizarTabela()">
+            <option value="todos" data-i18n="todos">Todos</option>
+            <option value="verde" data-i18n="statusApto">APTO</option>
+            <option value="amarelo" data-i18n="statusAtencao">ATENÇÃO</option>
+            <option value="vermelho" data-i18n="statusInapto">INAPTO</option>
+            <option value="cinza" data-i18n="statusDesligado">DESLIGADO</option>
+        </select>
+
+        <label for="filtroTreinamento" data-i18n="treinamentoLabel">Treinamento:</label>
+        <select id="filtroTreinamento" onchange="renderizarTabela()">
+            <option value="todos" data-i18n="todos">Todos</option>
+            <option value="ASO">ASO</option>
+            <option value="IRATA">IRATA</option>
+            <option value="GWO">GWO</option>
+            <option value="NRs">NR's</option>
+            <option value="Passaporte">Passaporte</option>
+        </select>
+    </div>
+
+    <!-- TABELA -->
+    <div class="tabela-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th data-i18n="colNum">#</th>
+                    <th data-i18n="colNome">Nome</th>
+                    <th data-i18n="colRegistro">Registro</th>
+                    <th>ASO</th>
+                    <th>IRATA</th>
+                    <th>GWO</th>
+                    <th>NR's</th>
+                    <th>Passaporte</th>
+                    <th data-i18n="colStatus">Status</th>
+                    <th data-i18n="colAcoes">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="corpoTabela"></tbody>
+        </table>
+    </div>
+
+    <div class="contador" id="contador"></div>
+</div>
+
+<!-- MODAL CADASTRO -->
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+        <button class="fechar" onclick="fecharModal()">×</button>
+        <h2 id="modalTitulo" data-i18n="cadastrarColaborador">Cadastrar Colaborador</h2>
+        <input type="hidden" id="editandoId" value="">
+
+        <div class="linha-dupla">
+            <div>
+                <label for="campoNome" data-i18n="nomeColaboradorLabel">Nome do Colaborador *</label>
+                <input type="text" id="campoNome" placeholder="Ex: João Silva" data-i18n-placeholder="nomeColaboradorPlaceholder">
+            </div>
+            <div>
+                <label for="campoRegistro" data-i18n="registroLabel">Registro *</label>
+                <input type="text" id="campoRegistro" placeholder="Ex: 12345" data-i18n-placeholder="registroPlaceholder">
+            </div>
+        </div>
+
+        <label for="campoDrive" data-i18n="linkPastaDriveLabel">Link da Pasta Drive</label>
+        <input type="url" id="campoDrive" placeholder="https://drive.google.com/drive/folders/...">
+
+        <div class="secao-treinamentos">
+            <h4 data-i18n="treinamentosTitulo">Treinamentos</h4>
+            <p style="color:#6b7f94; font-size:12px; margin-bottom:12px;" data-i18n="treinamentosInstrucao">
+                Preencha a data de realização de cada treinamento. O status será calculado automaticamente.
+            </p>
+
+            <div class="treinamento-item">
+                <label>ASO (12 meses)</label>
+                <input type="month" id="campoASO">
+                <div class="periodicidade-info" data-i18n="periodicidadeInfo12">Periodicidade: 12 meses</div>
+            </div>
+
+            <div class="treinamento-item">
+                <label>IRATA (36 meses)</label>
+                <input type="month" id="campoIRATA">
+                <div class="periodicidade-info" data-i18n="periodicidadeInfo36">Periodicidade: 36 meses</div>
+            </div>
+
+            <div class="treinamento-item">
+                <label>GWO (24 meses)</label>
+                <input type="month" id="campoGWO">
+                <div class="periodicidade-info" data-i18n="periodicidadeInfo24">Periodicidade: 24 meses</div>
+            </div>
+
+            <div class="treinamento-item">
+                <label>NR's (12 meses)</label>
+                <input type="month" id="campoNRs">
+                <div class="periodicidade-info" data-i18n="periodicidadeInfo12">Periodicidade: 12 meses</div>
+            </div>
+
+            <div class="treinamento-item">
+                <label>Passaporte (120 meses)</label>
+                <input type="month" id="campoPassaporte">
+                <div class="periodicidade-info" data-i18n="periodicidadeInfo120">Periodicidade: 120 meses</div>
+            </div>
+        </div>
+
+        <button class="btn-salvar" onclick="salvarColaborador()" data-i18n="salvarBtn">Salvar</button>
+    </div>
+</div>
+
+<!-- MODAL REGISTROS -->
+<div class="modal-overlay" id="modalRegistrosOverlay">
+    <div class="modal" style="max-width: 600px;">
+        <button class="fechar" onclick="fecharModalRegistros()">×</button>
+        <h2 id="modalRegistrosTitulo">Registros - Colaborador</h2>
+        <div id="conteudoRegistros" style="margin-top: 15px;"></div>
+        <div style="margin-top: 20px; display: flex; gap:10px;">
+            <button class="btn btn-drive" onclick="abrirPastaDrive()" style="flex:1;" data-i18n="abrirPastaDriveBtn">Abrir Pasta Drive</button>
+            <button class="btn btn-registros" onclick="fecharModalRegistros()" style="flex:1;" data-i18n="fecharBtn">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<!-- DASHBOARD MODAL -->
+<div class="dashboard-modal" id="dashboardModal">
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <h2>
+<span data-i18n="dashboardQualificacao">Dashboard de Qualificação</span>
+                <span id="totalDashboard">0</span>
+            </h2>
+            <button class="btn-fechar-dashboard" onclick="fecharDashboard()" data-i18n="fecharBtn">Fechar</button>
+        </div>
+
+        <div class="dashboard-filtros">
+            <label for="filtroBuscaDash" data-i18n="buscarLabel">Buscar:</label>
+            <input type="text" id="filtroBuscaDash" placeholder="Nome ou registro..." data-i18n-placeholder="buscarPlaceholder" oninput="atualizarDashboard()">
+
+            <label for="filtroStatusDash" data-i18n="statusLabel">Status:</label>
+            <select id="filtroStatusDash" onchange="atualizarDashboard()">
+                <option value="todos" data-i18n="todos">Todos</option>
+                <option value="verde" data-i18n="statusApto">APTO</option>
+                <option value="amarelo" data-i18n="statusAtencao">ATENÇÃO</option>
+                <option value="vermelho" data-i18n="statusInapto">INAPTO</option>
+            </select>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="dashboard-card">
+                <h3 data-i18n="distribuicaoStatus">Distribuição por Status</h3>
+                <canvas id="graficoStatus"></canvas>
+            </div>
+            <div class="dashboard-card">
+                <h3 data-i18n="treinamentosVencidosPareto">Treinamentos Vencidos (Pareto)</h3>
+                <canvas id="graficoPareto"></canvas>
+            </div>
+            <div class="dashboard-card">
+                <h3 data-i18n="statusPorColaborador">Status por Colaborador</h3>
+                <canvas id="graficoColaboradores"></canvas>
+            </div>
+            <div class="dashboard-card">
+                <h3 data-i18n="evolucaoCadastros">Evolução de Cadastros</h3>
+                <canvas id="graficoEvolucao"></canvas>
+            </div>
+        </div>
+
+        <div class="dashboard-footer">
+            <span id="infoDashboard" data-i18n="dadosAtualizadosTempoReal">Dados atualizados em tempo real</span>
+            <button class="btn-exportar-graficos" onclick="exportarDashboard()" data-i18n="exportarDashboardPng">Exportar Dashboard (PNG)</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // CONFIGURAÇÃO DA API
+    // ==========================================
+    
+    const API_URL = 'https://flowsuite-plus-api.flowsuite-plus.workers.dev';
+
+    // ==========================================
+    // AUTENTICAÇÃO / PERMISSÃO (FLOWSUITE)
+    // ==========================================
+    const FLOWSUITE_API_URL = API_URL;
+    const MODULO_ATUAL = 'trainingflow';
+    let empresaIdAtual = '';
+
+    // ==========================================
+    // IDIOMA / TRADUÇÃO (herdado do FlowSuite)
+    // ==========================================
+    // escapeHtml() agora vem do shared.js (carregado no <head>)
+
+    let idiomaAtual = localStorage.getItem('flowsuite_idioma') || 'pt';
+
+    const I18N = {
+        pt: {
+            subtitulo: 'Gerencie colaboradores, treinamentos e status em um só lugar.',
+            verificandoConexao: 'Verificando conexão...',
+            adicionarBtn: 'Adicionar',
+            exportarBtn: 'Exportar',
+            importarBtn: 'Importar',
+            limparFiltrosBtn: 'Limpar Filtros',
+            sincronizarBtn: 'Sincronizar',
+            dashboardBtn: 'Dashboard',
+            buscarLabel: 'Buscar:',
+            buscarPlaceholder: 'Nome ou registro...',
+            statusLabel: 'Status:',
+            treinamentoLabel: 'Treinamento:',
+            todos: 'Todos',
+            statusApto: 'APTO',
+            statusAtencao: 'ATENÇÃO',
+            statusInapto: 'INAPTO',
+            statusDesligado: 'DESLIGADO',
+            statusPendente: 'Pendente',
+            statusVencido: 'Vencido',
+            statusValido: 'Válido',
+            colNum: '#',
+            colNome: 'Nome',
+            colRegistro: 'Registro',
+            colStatus: 'Status',
+            colAcoes: 'Ações',
+            colDrive: 'Drive',
+            cadastrarColaborador: 'Cadastrar Colaborador',
+            editarColaborador: 'Editar Colaborador',
+            nomeColaboradorLabel: 'Nome do Colaborador *',
+            nomeColaboradorPlaceholder: 'Ex: João Silva',
+            registroLabel: 'Registro *',
+            registroPlaceholder: 'Ex: 12345',
+            linkPastaDriveLabel: 'Link da Pasta Drive',
+            treinamentosTitulo: 'Treinamentos',
+            treinamentosInstrucao: 'Preencha a data de realização de cada treinamento. O status será calculado automaticamente.',
+            periodicidadeInfo: 'Periodicidade: {qtd} meses',
+            periodicidadeInfo12: 'Periodicidade: 12 meses',
+            periodicidadeInfo24: 'Periodicidade: 24 meses',
+            periodicidadeInfo36: 'Periodicidade: 36 meses',
+            periodicidadeInfo120: 'Periodicidade: 120 meses',
+            salvarBtn: 'Salvar',
+            registrosTitulo: 'Registros - {nome}',
+            abrirPastaDriveBtn: 'Abrir Pasta Drive',
+            fecharBtn: 'Fechar',
+            realizacaoLabel: 'Realização: {data}',
+            venceLabel: 'Vence: {data} ({qtd} meses)',
+            diasLabel: '{qtd} dias',
+            registroColabLabel: 'Registro: {registro}',
+            driveConfigurado: 'Drive: Configurado',
+            driveNaoConfigurado: 'Drive: Não configurado',
+            dashboardQualificacao: 'Dashboard de Qualificação',
+            distribuicaoStatus: 'Distribuição por Status',
+            treinamentosVencidosPareto: 'Treinamentos Vencidos (Pareto)',
+            statusPorColaborador: 'Status por Colaborador',
+            evolucaoCadastros: 'Evolução de Cadastros',
+            dadosAtualizadosTempoReal: 'Dados atualizados em tempo real',
+            exportarDashboardPng: 'Exportar Dashboard (PNG)',
+            dadosSalvosLocalmente: 'Dados salvos localmente. Sincronize quando possível.',
+            dadosExcluidosLocalmente: 'Dados excluídos localmente. Sincronize quando possível.',
+            nenhumColaboradorAlerta: 'Nenhum colaborador em alerta. Cadastre alguém com status Amarelo ou Vermelho para testar.',
+            emailTesteSucesso: 'E-mail de teste enviado com sucesso! Verifique sua caixa de entrada.',
+            falhaEmailTeste: 'Falha ao enviar e-mail de teste.',
+            controleEmailResetado: 'Controle de e-mail resetado. O próximo e-mail será enviado na próxima mudança de status.',
+            semPermissaoAdicionar: 'Você não tem permissão para adicionar colaboradores.',
+            semPermissaoEditar: 'Você não tem permissão para editar colaboradores.',
+            semPermissaoSalvar: 'Você não tem permissão para salvar colaboradores.',
+            semPermissaoExcluir: 'Você não tem permissão para excluir colaboradores.',
+            semPermissaoImportar: 'Você não tem permissão para importar dados.',
+            preencherNomeColaborador: 'Preencha o nome do colaborador.',
+            preencherRegistro: 'Preencha o registro.',
+            linkDriveInvalido: 'O link do Drive precisa começar com http:// ou https://',
+            operacaoSucesso: 'Operação realizada com sucesso!',
+            erroSalvar: 'Erro ao salvar: {erro}',
+            erroDesconhecido: 'Erro desconhecido',
+            confirmExcluirColaborador: 'Tem certeza que deseja excluir "{nome}"?',
+            colaboradorExcluidoSucesso: 'Colaborador excluído com sucesso!',
+            erroExcluir: 'Erro ao excluir: {erro}',
+            nenhumColaboradorSelecionado: 'Nenhum colaborador selecionado.',
+            semLinkDrive: 'Este colaborador não possui link da pasta Drive configurado.',
+            nenhumColaboradorExportar: 'Nenhum colaborador para exportar com os filtros atuais.',
+            arquivoInvalido: 'Arquivo inválido.',
+            confirmImportar: 'Importar {qtd} colaboradores? Os dados atuais serão substituídos.',
+            importacaoSucesso: 'Importação realizada com sucesso!',
+            erroLerArquivo: 'Erro ao ler o arquivo. Certifique-se de que é um JSON válido.',
+            dadosSincronizadosSucesso: 'Dados sincronizados com sucesso!',
+            erroSincronizar: 'Erro ao sincronizar: {erro}',
+            erroGerarImagem: 'Erro ao gerar imagem. Tente novamente.',
+            colaboradoresInaptosTitulo: 'COLABORADORES INAPTOS!',
+            qtdColaboradoresInaptos: '{qtd} colaborador(es) INAPTOS:',
+            treinamentosVencidos: 'Treinamentos vencidos',
+            regularizeUrgente: 'Regularize URGENTEMENTE estes colaboradores!',
+            colaboradoresAtencaoTitulo: 'COLABORADORES EM ATENÇÃO!',
+            qtdColaboradoresAtencao: '{qtd} colaborador(es) com treinamentos próximos do vencimento:',
+            treinamentosVencemEm60: 'Treinamentos vencem em até 60 dias',
+            agendeReciclagem: 'Agende a reciclagem destes colaboradores.',
+        },
+        en: {
+            subtitulo: 'Manage employees, training and status in one place.',
+            verificandoConexao: 'Checking connection...',
+            adicionarBtn: 'Add',
+            exportarBtn: 'Export',
+            importarBtn: 'Import',
+            limparFiltrosBtn: 'Clear Filters',
+            sincronizarBtn: 'Sync',
+            dashboardBtn: 'Dashboard',
+            buscarLabel: 'Search:',
+            buscarPlaceholder: 'Name or ID...',
+            statusLabel: 'Status:',
+            treinamentoLabel: 'Training:',
+            todos: 'All',
+            statusApto: 'FIT',
+            statusAtencao: 'ATTENTION',
+            statusInapto: 'UNFIT',
+            statusDesligado: 'INACTIVE',
+            statusPendente: 'Pending',
+            statusVencido: 'Expired',
+            statusValido: 'Valid',
+            colNum: '#',
+            colNome: 'Name',
+            colRegistro: 'ID',
+            colStatus: 'Status',
+            colAcoes: 'Actions',
+            colDrive: 'Drive',
+            cadastrarColaborador: 'Add Employee',
+            editarColaborador: 'Edit Employee',
+            nomeColaboradorLabel: 'Employee Name *',
+            nomeColaboradorPlaceholder: 'E.g.: John Smith',
+            registroLabel: 'ID *',
+            registroPlaceholder: 'E.g.: 12345',
+            linkPastaDriveLabel: 'Drive Folder Link',
+            treinamentosTitulo: 'Training',
+            treinamentosInstrucao: 'Fill in the completion date for each training. Status will be calculated automatically.',
+            periodicidadeInfo: 'Frequency: {qtd} months',
+            periodicidadeInfo12: 'Frequency: 12 months',
+            periodicidadeInfo24: 'Frequency: 24 months',
+            periodicidadeInfo36: 'Frequency: 36 months',
+            periodicidadeInfo120: 'Frequency: 120 months',
+            salvarBtn: 'Save',
+            registrosTitulo: 'Records - {nome}',
+            abrirPastaDriveBtn: 'Open Drive Folder',
+            fecharBtn: 'Close',
+            realizacaoLabel: 'Completed on: {data}',
+            venceLabel: 'Expires: {data} ({qtd} months)',
+            diasLabel: '{qtd} days',
+            registroColabLabel: 'ID: {registro}',
+            driveConfigurado: 'Drive: Configured',
+            driveNaoConfigurado: 'Drive: Not configured',
+            dashboardQualificacao: 'Qualification Dashboard',
+            distribuicaoStatus: 'Status Distribution',
+            treinamentosVencidosPareto: 'Expired Training (Pareto)',
+            statusPorColaborador: 'Status by Employee',
+            evolucaoCadastros: 'Registration Evolution',
+            dadosAtualizadosTempoReal: 'Data updated in real time',
+            exportarDashboardPng: 'Export Dashboard (PNG)',
+            dadosSalvosLocalmente: 'Data saved locally. Sync when possible.',
+            dadosExcluidosLocalmente: 'Data deleted locally. Sync when possible.',
+            nenhumColaboradorAlerta: 'No employees in alert. Add someone with Yellow or Red status to test.',
+            emailTesteSucesso: 'Test email sent successfully! Check your inbox.',
+            falhaEmailTeste: 'Failed to send test email.',
+            controleEmailResetado: 'Email control reset. The next email will be sent on the next status change.',
+            semPermissaoAdicionar: 'You do not have permission to add employees.',
+            semPermissaoEditar: 'You do not have permission to edit employees.',
+            semPermissaoSalvar: 'You do not have permission to save employees.',
+            semPermissaoExcluir: 'You do not have permission to delete employees.',
+            semPermissaoImportar: 'You do not have permission to import data.',
+            preencherNomeColaborador: 'Fill in the employee name.',
+            preencherRegistro: 'Fill in the ID.',
+            linkDriveInvalido: 'The Drive link must start with http:// or https://',
+            operacaoSucesso: 'Operation completed successfully!',
+            erroSalvar: 'Error saving: {erro}',
+            erroDesconhecido: 'Unknown error',
+            confirmExcluirColaborador: 'Are you sure you want to delete "{nome}"?',
+            colaboradorExcluidoSucesso: 'Employee deleted successfully!',
+            erroExcluir: 'Error deleting: {erro}',
+            nenhumColaboradorSelecionado: 'No employee selected.',
+            semLinkDrive: 'This employee does not have a Drive folder link configured.',
+            nenhumColaboradorExportar: 'No employees to export with the current filters.',
+            arquivoInvalido: 'Invalid file.',
+            confirmImportar: 'Import {qtd} employees? Current data will be replaced.',
+            importacaoSucesso: 'Import completed successfully!',
+            erroLerArquivo: 'Error reading the file. Make sure it is valid JSON.',
+            dadosSincronizadosSucesso: 'Data synced successfully!',
+            erroSincronizar: 'Error syncing: {erro}',
+            erroGerarImagem: 'Error generating image. Please try again.',
+            colaboradoresInaptosTitulo: 'UNFIT EMPLOYEES!',
+            qtdColaboradoresInaptos: '{qtd} UNFIT employee(s):',
+            treinamentosVencidos: 'Expired training',
+            regularizeUrgente: 'Regularize these employees URGENTLY!',
+            colaboradoresAtencaoTitulo: 'EMPLOYEES NEEDING ATTENTION!',
+            qtdColaboradoresAtencao: '{qtd} employee(s) with training nearing expiration:',
+            treinamentosVencemEm60: 'Training expires within 60 days',
+            agendeReciclagem: 'Schedule refresher training for these employees.',
+        },
+        es: {
+            subtitulo: 'Gestione colaboradores, capacitaciones y estados en un solo lugar.',
+            verificandoConexao: 'Verificando conexión...',
+            adicionarBtn: 'Agregar',
+            exportarBtn: 'Exportar',
+            importarBtn: 'Importar',
+            limparFiltrosBtn: 'Limpiar Filtros',
+            sincronizarBtn: 'Sincronizar',
+            dashboardBtn: 'Panel',
+            buscarLabel: 'Buscar:',
+            buscarPlaceholder: 'Nombre o registro...',
+            statusLabel: 'Estado:',
+            treinamentoLabel: 'Capacitación:',
+            todos: 'Todos',
+            statusApto: 'APTO',
+            statusAtencao: 'ATENCIÓN',
+            statusInapto: 'NO APTO',
+            statusDesligado: 'INACTIVO',
+            statusPendente: 'Pendiente',
+            statusVencido: 'Vencido',
+            statusValido: 'Válido',
+            colNum: '#',
+            colNome: 'Nombre',
+            colRegistro: 'Registro',
+            colStatus: 'Estado',
+            colAcoes: 'Acciones',
+            colDrive: 'Drive',
+            cadastrarColaborador: 'Registrar Colaborador',
+            editarColaborador: 'Editar Colaborador',
+            nomeColaboradorLabel: 'Nombre del Colaborador *',
+            nomeColaboradorPlaceholder: 'Ej: Juan Pérez',
+            registroLabel: 'Registro *',
+            registroPlaceholder: 'Ej: 12345',
+            linkPastaDriveLabel: 'Enlace de la Carpeta Drive',
+            treinamentosTitulo: 'Capacitaciones',
+            treinamentosInstrucao: 'Complete la fecha de realización de cada capacitación. El estado se calculará automáticamente.',
+            periodicidadeInfo: 'Periodicidad: {qtd} meses',
+            periodicidadeInfo12: 'Periodicidad: 12 meses',
+            periodicidadeInfo24: 'Periodicidad: 24 meses',
+            periodicidadeInfo36: 'Periodicidad: 36 meses',
+            periodicidadeInfo120: 'Periodicidad: 120 meses',
+            salvarBtn: 'Guardar',
+            registrosTitulo: 'Registros - {nome}',
+            abrirPastaDriveBtn: 'Abrir Carpeta Drive',
+            fecharBtn: 'Cerrar',
+            realizacaoLabel: 'Realización: {data}',
+            venceLabel: 'Vence: {data} ({qtd} meses)',
+            diasLabel: '{qtd} días',
+            registroColabLabel: 'Registro: {registro}',
+            driveConfigurado: 'Drive: Configurado',
+            driveNaoConfigurado: 'Drive: No configurado',
+            dashboardQualificacao: 'Panel de Calificación',
+            distribuicaoStatus: 'Distribución por Estado',
+            treinamentosVencidosPareto: 'Capacitaciones Vencidas (Pareto)',
+            statusPorColaborador: 'Estado por Colaborador',
+            evolucaoCadastros: 'Evolución de Registros',
+            dadosAtualizadosTempoReal: 'Datos actualizados en tiempo real',
+            exportarDashboardPng: 'Exportar Panel (PNG)',
+            dadosSalvosLocalmente: 'Datos guardados localmente. Sincronice cuando sea posible.',
+            dadosExcluidosLocalmente: 'Datos eliminados localmente. Sincronice cuando sea posible.',
+            nenhumColaboradorAlerta: 'Ningún colaborador en alerta. Registre a alguien con estado Amarillo o Rojo para probar.',
+            emailTesteSucesso: '¡Correo de prueba enviado con éxito! Revise su bandeja de entrada.',
+            falhaEmailTeste: 'Error al enviar el correo de prueba.',
+            controleEmailResetado: 'Control de correo reiniciado. El próximo correo se enviará en el próximo cambio de estado.',
+            semPermissaoAdicionar: 'No tiene permiso para agregar colaboradores.',
+            semPermissaoEditar: 'No tiene permiso para editar colaboradores.',
+            semPermissaoSalvar: 'No tiene permiso para guardar colaboradores.',
+            semPermissaoExcluir: 'No tiene permiso para eliminar colaboradores.',
+            semPermissaoImportar: 'No tiene permiso para importar datos.',
+            preencherNomeColaborador: 'Complete el nombre del colaborador.',
+            preencherRegistro: 'Complete el registro.',
+            linkDriveInvalido: 'El enlace de Drive debe comenzar con http:// o https://',
+            operacaoSucesso: '¡Operación realizada con éxito!',
+            erroSalvar: 'Error al guardar: {erro}',
+            erroDesconhecido: 'Error desconocido',
+            confirmExcluirColaborador: '¿Está seguro de que desea eliminar a "{nome}"?',
+            colaboradorExcluidoSucesso: '¡Colaborador eliminado con éxito!',
+            erroExcluir: 'Error al eliminar: {erro}',
+            nenhumColaboradorSelecionado: 'Ningún colaborador seleccionado.',
+            semLinkDrive: 'Este colaborador no tiene un enlace de carpeta Drive configurado.',
+            nenhumColaboradorExportar: 'No hay colaboradores para exportar con los filtros actuales.',
+            arquivoInvalido: 'Archivo inválido.',
+            confirmImportar: '¿Importar {qtd} colaboradores? Los datos actuales serán reemplazados.',
+            importacaoSucesso: '¡Importación realizada con éxito!',
+            erroLerArquivo: 'Error al leer el archivo. Asegúrese de que sea un JSON válido.',
+            dadosSincronizadosSucesso: '¡Datos sincronizados con éxito!',
+            erroSincronizar: 'Error al sincronizar: {erro}',
+            erroGerarImagem: 'Error al generar la imagen. Inténtelo de nuevo.',
+            colaboradoresInaptosTitulo: '¡COLABORADORES NO APTOS!',
+            qtdColaboradoresInaptos: '{qtd} colaborador(es) NO APTOS:',
+            treinamentosVencidos: 'Capacitaciones vencidas',
+            regularizeUrgente: '¡Regularice URGENTEMENTE a estos colaboradores!',
+            colaboradoresAtencaoTitulo: '¡COLABORADORES EN ATENCIÓN!',
+            qtdColaboradoresAtencao: '{qtd} colaborador(es) con capacitaciones próximas a vencer:',
+            treinamentosVencemEm60: 'Las capacitaciones vencen en hasta 60 días',
+            agendeReciclagem: 'Programe la actualización de estos colaboradores.',
+        }
+    };
+
+    // t(), tf() e aplicarIdioma() agora vêm do shared.js (usam I18N e idiomaAtual daqui)
+
+    // Traduz o texto do status APENAS para exibição.
+    // O valor interno (status.texto) continua em português, usado nas comparações do código.
+    function textoStatusExibicao(texto) {
+        const mapa = {
+            'APTO': t('statusApto'),
+            'ATENÇÃO': t('statusAtencao'),
+            'INAPTO': t('statusInapto'),
+            'DESLIGADO': t('statusDesligado'),
+            'Pendente': t('statusPendente'),
+            'Vencido': t('statusVencido'),
+            'Atenção': t('statusAtencao'),
+            'Válido': t('statusValido')
+        };
+        return mapa[texto] || texto;
+    }
+
+    let permissaoUsuario = null; // 'admin' | 'editor' | 'leitura'
+    let usuarioFlowsuite = null;
+
+    // getTokenDaURL() e getEmpresaVisualizandoDaURL() agora vêm do shared.js
+
+    async function validarAcessoFlowsuite() {
+        const token = getTokenDaURL();
+        if (!token) return false;
+
+        try {
+            const response = await fetch(FLOWSUITE_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ acao: 'verificar', token: token, empresaVisualizando: getEmpresaVisualizandoDaURL() })
+            });
+            const resultado = await response.json();
+
+            if (!resultado.valido || !resultado.usuario.modulos.includes(MODULO_ATUAL)) {
+                return false;
+            }
+
+            empresaIdAtual = resultado.usuario.empresa || getEmpresaVisualizandoDaURL() || '';
+            usuarioFlowsuite = resultado.usuario;
+            permissaoUsuario = resultado.usuario.permissao || 'leitura';
+            return true;
+        } catch (e) {
+            console.error('Erro ao validar acesso FlowSuite:', e);
+            return false;
+        }
+    }
+
+    // podeEditar() e podeExcluir() agora vêm do shared.js (usam permissaoUsuario daqui)
+
+    function bloquearAcesso() {
+        document.body.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:Arial,sans-serif;text-align:center;">
+                <div>
+                    <div style="font-size:50px;"></div>
+                    <h2 style="color:#2C3E50;margin:10px 0;">Acesso restrito</h2>
+                    <p style="color:#666;">Acesse esta ferramenta pelo FlowSuite.</p>
+                </div>
+            </div>
+        `;
+    }
+
+    function aplicarPermissoesNaTela() {
+        const btnAdicionar = document.getElementById('btnAdicionar');
+        const btnImportar = document.getElementById('btnImportar');
+        if (btnAdicionar) btnAdicionar.style.display = podeEditar() ? '' : 'none';
+        if (btnImportar) btnImportar.style.display = podeEditar() ? '' : 'none';
+    }
+
+    // ==========================================
+    // DADOS
+    // ==========================================
+
+    let colaboradores = [];
+    let proximoId = 1;
+    let statusAnterior = {};
+    let emailJaEnviadoHoje = false;
+    let colaboradorSelecionado = null;
+
+    // ==========================================
+    // PERIODICIDADES DOS TREINAMENTOS (em meses)
+    // ==========================================
+
+    const PERIODICIDADES = {
+        ASO: 12,
+        IRATA: 36,
+        GWO: 24,
+        NRs: 12,
+        Passaporte: 120
+    };
+
+    const TREINAMENTOS_LISTA = ['ASO', 'IRATA', 'GWO', 'NRs', 'Passaporte'];
+    // ==========================================
+    // FUNÇÕES DE COMUNICAÇÃO COM A API
+    // ==========================================
+
+    async function carregarDados() {
+        try {
+            console.log('Carregando dados da API...');
+            
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ acao: 'listarColaboradores', token: getTokenDaURL(), empresaId: empresaIdAtual })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Erro HTTP: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Dados recebidos:', result);
+            
+            if (result && result.success === true) {
+                colaboradores = result.dados || [];
+                let maxId = 0;
+                colaboradores.forEach(c => {
+                    if (c.id && c.id > maxId) maxId = c.id;
+                });
+                proximoId = maxId + 1;
+                salvarNoLocalStorage();
+                renderizarTabela();
+                atualizarStatusConexao(true);
+                console.log('Dados carregados:', colaboradores.length, 'colaboradores');
+            } else {
+                console.error('Erro ao carregar:', result?.error || 'Resposta inválida');
+                console.error('Resposta completa:', result);
+                atualizarStatusConexao(false);
+                carregarDoLocalStorage();
+            }
+        } catch (error) {
+            console.error('Erro de conexão:', error);
+            console.error('Detalhes:', error.message);
+            atualizarStatusConexao(false);
+            carregarDoLocalStorage();
+        }
+    }
+
+    // ==========================================
+    // SALVAR COLABORADOR API
+    // ==========================================
+
+    async function salvarColaboradorAPI(dados) {
+        try {
+            dados.token = getTokenDaURL();
+            dados.empresaId = empresaIdAtual;
+            dados.acao = 'salvarColaborador';
+            console.log('Enviando dados para API:', dados);
+            
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dados)
+            });
+            const resultado = await response.json();
+            
+            if (!resultado.success) {
+                throw new Error(resultado.error || 'erro_desconhecido');
+            }
+            
+            console.log('Recarregando lista...');
+            await carregarDados();
+            return { success: true };
+            
+        } catch (error) {
+            console.error('Erro ao salvar via API:', error);
+            
+            try {
+                const index = dados.id ? colaboradores.findIndex(c => c.id === dados.id) : -1;
+                console.log('Índice no array local:', index);
+                
+                if (index >= 0) {
+                    colaboradores[index] = { ...colaboradores[index], ...dados };
+                    console.log('Atualizado localmente:', colaboradores[index]);
+                } else {
+                    const newId = proximoId++;
+                    colaboradores.push({ ...dados, id: newId });
+                    console.log('Adicionado localmente com ID:', newId);
+                }
+                salvarNoLocalStorage();
+                renderizarTabela();
+                alert(t('dadosSalvosLocalmente'));
+                return { success: true, fallback: true };
+            } catch (e2) {
+                return { success: false, error: error.message };
+            }
+        }
+    }
+
+    async function excluirColaboradorAPI(id) {
+        try {
+            console.log('Excluindo ID:', id);
+            
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ acao: 'excluirColaborador', id: id, token: getTokenDaURL(), empresaId: empresaIdAtual })
+            });
+            const resultado = await response.json();
+            
+            if (!resultado.success) {
+                throw new Error(resultado.error || 'erro_desconhecido');
+            }
+            
+            console.log('Recarregando lista...');
+            await carregarDados();
+            return { success: true };
+            
+        } catch (error) {
+            console.error('Erro ao excluir via API:', error);
+            
+            try {
+                const index = colaboradores.findIndex(c => c.id === id);
+                if (index >= 0) {
+                    colaboradores.splice(index, 1);
+                    salvarNoLocalStorage();
+                    renderizarTabela();
+                    alert(t('dadosExcluidosLocalmente'));
+                    return { success: true, fallback: true };
+                }
+                return { success: false, error: 'ID não encontrado' };
+            } catch (e2) {
+                return { success: false, error: error.message };
+            }
+        }
+    }
+
+    // ==========================================
+    // LOCAL STORAGE (CACHE) — separado por empresa, pra não misturar
+    // dados de uma empresa com outra quando a conexão falhar.
+    // chaveCache() agora vem do shared.js (usa usuarioFlowsuite daqui)
+    // ==========================================
+
+    function salvarNoLocalStorage() {
+        localStorage.setItem(chaveCache('ehs_colaboradores'), JSON.stringify(colaboradores));
+        localStorage.setItem(chaveCache('ehs_proximoId'), String(proximoId));
+        salvarStatusAtualEHS();
+    }
+
+    function carregarDoLocalStorage() {
+        try {
+            const dados = localStorage.getItem(chaveCache('ehs_colaboradores'));
+            if (dados) {
+                const parsed = JSON.parse(dados);
+                if (Array.isArray(parsed)) {
+                    colaboradores = parsed;
+                } else {
+                    colaboradores = [];
+                }
+                const idSalvo = localStorage.getItem(chaveCache('ehs_proximoId'));
+                proximoId = idSalvo ? parseInt(idSalvo) : 1;
+                console.log('Dados carregados do cache local:', colaboradores.length, 'colaboradores');
+            } else {
+                colaboradores = [];
+                proximoId = 1;
+            }
+        } catch (e) {
+            console.error('Erro ao carregar do localStorage:', e);
+            colaboradores = [];
+            proximoId = 1;
+        }
+        carregarStatusAnteriorEHS();
+        renderizarTabela();
+    }
+
+    // ==========================================
+    // STATUS DE CONEXÃO
+    // ==========================================
+
+    function atualizarStatusConexao(online) {
+        const status = document.getElementById('statusConexao');
+        if (online) {
+            status.textContent = 'Online (Google Sheets)';
+            status.className = 'status-online online';
+        } else {
+            status.textContent = 'Offline (Dados locais)';
+            status.className = 'status-online offline';
+        }
+    }
+    // ==========================================
+    // CÁLCULO DO STATUS COM PERIODICIDADE
+    // ==========================================
+
+    function getStatusTreinamento(dataRealizacao, periodicidade) {
+        if (!dataRealizacao) return { cor: 'cinza', texto: 'Pendente', diasRestantes: null };
+        
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        
+        const dataBase = new Date(dataRealizacao);
+        dataBase.setHours(0, 0, 0, 0);
+        
+        const dataVencimento = new Date(dataBase);
+        dataVencimento.setMonth(dataVencimento.getMonth() + periodicidade);
+        
+        const diffTime = dataVencimento - hoje;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0) {
+            return { cor: 'vermelho', texto: 'Vencido', diasRestantes: diffDays };
+        } else if (diffDays <= 60) {
+            return { cor: 'amarelo', texto: 'Atenção', diasRestantes: diffDays };
+        } else {
+            return { cor: 'verde', texto: 'Válido', diasRestantes: diffDays };
+        }
+    }
+
+    function getStatusColaborador(treinamentos) {
+        if (!treinamentos || typeof treinamentos !== 'object') {
+            return { cor: 'cinza', texto: 'DESLIGADO' };
+        }
+        
+        let temVencido = false;
+        let temAtencao = false;
+        let totalPreenchidos = 0;
+
+        TREINAMENTOS_LISTA.forEach(key => {
+            const data = treinamentos[key];
+            if (data && data !== '') {
+                totalPreenchidos++;
+                const periodicidade = PERIODICIDADES[key] || 12;
+                const status = getStatusTreinamento(data, periodicidade);
+                if (status.cor === 'vermelho') temVencido = true;
+                else if (status.cor === 'amarelo') temAtencao = true;
+            }
+        });
+
+        if (totalPreenchidos === 0) {
+            return { cor: 'cinza', texto: 'DESLIGADO' };
+        }
+
+        if (temVencido) {
+            return { cor: 'vermelho', texto: 'INAPTO' };
+        } else if (temAtencao) {
+            return { cor: 'amarelo', texto: 'ATENÇÃO' };
+        } else {
+            return { cor: 'verde', texto: 'APTO' };
+        }
+    }
+
+    function getCorData(treinamento, data) {
+        if (!data) return 'data-cinza';
+        const periodicidade = PERIODICIDADES[treinamento] || 12;
+        const status = getStatusTreinamento(data, periodicidade);
+        if (status.cor === 'verde') return 'data-verde';
+        if (status.cor === 'amarelo') return 'data-amarelo';
+        if (status.cor === 'vermelho') return 'data-vermelho';
+        return 'data-cinza';
+    }
+
+    function getBadgeClass(cor) {
+        const map = {
+            'verde': 'badge-verde',
+            'amarelo': 'badge-amarelo',
+            'vermelho': 'badge-vermelho',
+            'cinza': 'badge-pendente'
+        };
+        return map[cor] || 'badge-pendente';
+    }
+
+    // ==========================================
+    // STATUS ANTERIOR (para detectar mudanças)
+    // ==========================================
+
+    function salvarStatusAtualEHS() {
+        const statusMap = {};
+        colaboradores.forEach(c => {
+            const status = getStatusColaborador(c.treinamentos);
+            statusMap[c.id] = status.cor;
+        });
+        localStorage.setItem(chaveCache('ehs_statusAnterior'), JSON.stringify(statusMap));
+    }
+
+    function carregarStatusAnteriorEHS() {
+        const dados = localStorage.getItem(chaveCache('ehs_statusAnterior'));
+        if (dados) {
+            statusAnterior = JSON.parse(dados);
+        } else {
+            statusAnterior = {};
+        }
+    }
+
+    // ==========================================
+    // FUNÇÃO PARA DISPARAR E-MAIL VIA BACKEND
+    // ==========================================
+
+    async function enviarEmailAlertasEHS(colaboradoresAlerta) {
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    acao: 'enviarAlertaTreinamento',
+                    token: getTokenDaURL(),
+                    empresaId: empresaIdAtual
+                })
+            });
+            const resultado = await response.json();
+            console.log('E-mail de alerta disparado:', resultado);
+            return resultado;
+        } catch (error) {
+            console.error('Erro ao enviar e-mail:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    // ==========================================
+    // VERIFICAR ALERTAS AO ABRIR (POP-UP)
+    // ==========================================
+
+    function verificarAlertasAbrirEHS() {
+        if (!colaboradores || colaboradores.length === 0) return;
+        
+        const alertasAtencao = colaboradores.filter(c => {
+            const status = getStatusColaborador(c.treinamentos);
+            return status.cor === 'amarelo';
+        });
+        
+        const alertasInaptos = colaboradores.filter(c => {
+            const status = getStatusColaborador(c.treinamentos);
+            return status.cor === 'vermelho';
+        });
+        
+        if (alertasInaptos.length > 0) {
+            let msg = `${t('colaboradoresInaptosTitulo')}\n\n`;
+            msg += `═══════════════════════════════════════════\n\n`;
+            msg += `${tf('qtdColaboradoresInaptos', {qtd: alertasInaptos.length})}\n\n`;
+            
+            alertasInaptos.forEach((c, index) => {
+                msg += `${index + 1}. ${c.nome}\n`;
+                msg += `${t('colRegistro')}: ${c.registro}\n`;
+                msg += `${t('treinamentosVencidos')}\n\n`;
+            });
+            
+            msg += `═══════════════════════════════════════════\n`;
+            msg += t('regularizeUrgente');
+            
+            alert(msg);
+        }
+        
+        if (alertasAtencao.length > 0) {
+            let msg = `${t('colaboradoresAtencaoTitulo')}\n\n`;
+            msg += `═══════════════════════════════════════════\n\n`;
+            msg += `${tf('qtdColaboradoresAtencao', {qtd: alertasAtencao.length})}\n\n`;
+            
+            alertasAtencao.forEach((c, index) => {
+                msg += `${index + 1}. ${c.nome}\n`;
+                msg += `${t('colRegistro')}: ${c.registro}\n`;
+                msg += `${t('treinamentosVencemEm60')}\n\n`;
+            });
+            
+            msg += `═══════════════════════════════════════════\n`;
+            msg += t('agendeReciclagem');
+            
+            alert(msg);
+        }
+        
+        if (alertasInaptos.length === 0 && alertasAtencao.length === 0) {
+            console.log('Nenhum colaborador em alerta.');
+        }
+    }
+
+    // ==========================================
+    // VERIFICAR MUDANÇAS DE STATUS E DISPARAR E-MAIL
+    // ==========================================
+
+    function verificarMudancasStatusEHS() {
+        const mudancas = [];
+        
+        colaboradores.forEach(c => {
+            const statusAtual = getStatusColaborador(c.treinamentos);
+            const statusAntigo = statusAnterior[c.id] || 'verde';
+            
+            // Verifica mudança: verde -> amarelo OU amarelo -> vermelho
+            if ((statusAntigo === 'verde' && statusAtual.cor === 'amarelo') ||
+                (statusAntigo === 'amarelo' && statusAtual.cor === 'vermelho')) {
+                mudancas.push({
+                    colaborador: c,
+                    statusAntigo: statusAntigo,
+                    statusNovo: statusAtual.cor,
+                    statusTexto: statusAtual.texto
+                });
+            }
+        });
+        
+        if (mudancas.length > 0) {
+            console.log(`${mudancas.length} mudança(s) de status detectada(s).`);
+            mudancas.forEach(m => {
+                console.log(` • ${m.colaborador.nome}: ${m.statusAntigo} → ${m.statusNovo}`);
+            });
+            
+            // Coletar TODOS os colaboradores em alerta (amarelo + vermelho)
+            const atencao = colaboradores.filter(c => {
+                const status = getStatusColaborador(c.treinamentos);
+                return status.cor === 'amarelo';
+            });
+            
+            const inaptos = colaboradores.filter(c => {
+                const status = getStatusColaborador(c.treinamentos);
+                return status.cor === 'vermelho';
+            });
+            
+            // Monta lista completa de alertas com status
+            const todosAlertas = [
+                ...atencao.map(c => ({ ...c, status: 'amarelo' })),
+                ...inaptos.map(c => ({ ...c, status: 'vermelho' }))
+            ];
+            
+            // Disparar e-mail automaticamente
+            dispararEmailAutomaticoEHS(todosAlertas);
+        }
+        
+        salvarStatusAtualEHS();
+    }
+    // ==========================================
+    // FUNÇÃO PARA DISPARAR E-MAIL VIA BACKEND
+    // ==========================================
+
+    async function enviarEmailAlertasEHS(colaboradoresAlerta) {
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    acao: 'enviarAlertaTreinamento',
+                    token: getTokenDaURL(),
+                    empresaId: empresaIdAtual
+                })
+            });
+            const resultado = await response.json();
+            console.log('E-mail de alerta disparado:', resultado);
+            return resultado;
+        } catch (error) {
+            console.error('Erro ao enviar e-mail:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    // ==========================================
+    // DISPARAR E-MAIL AUTOMATICAMENTE
+    // ==========================================
+
+    async function dispararEmailAutomaticoEHS(colaboradoresAlerta) {
+        // Verifica se já foi enviado hoje (evita duplicidade no mesmo dia)
+        const hoje = new Date().toDateString();
+        const ultimoEnvio = localStorage.getItem(chaveCache('ehs_ultimoEnvioEmail'));
+        
+        if (ultimoEnvio === hoje) {
+            console.log('E-mail já enviado hoje. Aguardando nova mudança de status.');
+            return;
+        }
+        
+        if (colaboradoresAlerta.length === 0) {
+            console.log('Nenhum colaborador em alerta. E-mail não enviado.');
+            return;
+        }
+        
+        console.log(`Preparando envio de e-mail com ${colaboradoresAlerta.length} colaborador(es) em alerta...`);
+        
+        const result = await enviarEmailAlertasEHS(colaboradoresAlerta);
+        
+        if (result.success) {
+            localStorage.setItem(chaveCache('ehs_ultimoEnvioEmail'), hoje);
+            console.log('E-mail enviado com sucesso!');
+        } else {
+            console.error('Falha ao enviar e-mail:', result.error);
+        }
+    }
+
+    // ==========================================
+    // FUNÇÃO PARA TESTAR E-MAIL MANUALMENTE
+    // ==========================================
+
+    async function testarEnvioEmailEHS() {
+        console.log('Testando envio de e-mail...');
+        
+        const atencao = colaboradores.filter(c => {
+            const status = getStatusColaborador(c.treinamentos);
+            return status.cor === 'amarelo';
+        });
+        
+        const inaptos = colaboradores.filter(c => {
+            const status = getStatusColaborador(c.treinamentos);
+            return status.cor === 'vermelho';
+        });
+        
+        const todosAlertas = [
+            ...atencao.map(c => ({ ...c, status: 'amarelo' })),
+            ...inaptos.map(c => ({ ...c, status: 'vermelho' }))
+        ];
+        
+        if (todosAlertas.length === 0) {
+            console.log('ℹ Nenhum colaborador em alerta para testar.');
+            alert(t('nenhumColaboradorAlerta'));
+            return;
+        }
+        
+        console.log(`Enviando e-mail de teste com ${todosAlertas.length} alerta(s)...`);
+        const result = await enviarEmailAlertasEHS(todosAlertas);
+        
+        if (result.success) {
+            console.log('E-mail de teste enviado com sucesso!');
+            alert(t('emailTesteSucesso'));
+        } else {
+            console.error('Falha no teste:', result.error);
+            alert(t('falhaEmailTeste'));
+        }
+    }
+
+    // ==========================================
+    // RESETAR CONTROLE DE E-MAIL
+    // ==========================================
+
+    function resetarControleEmailEHS() {
+        localStorage.removeItem(chaveCache('ehs_ultimoEnvioEmail'));
+        console.log('Controle de e-mail resetado. Próxima mudança de status disparará e-mail.');
+        alert(t('controleEmailResetado'));
+    }
+    // ==========================================
+    // FUNÇÕES DE FORMATAÇÃO
+    // ==========================================
+
+    function formatarData(dateStr) {
+        if (!dateStr) return '-';
+        try {
+            const d = new Date(dateStr);
+            if (!isNaN(d.getTime())) {
+                const dia = String(d.getUTCDate()).padStart(2, '0');
+                const mes = String(d.getUTCMonth() + 1).padStart(2, '0');
+                const ano = d.getUTCFullYear();
+                return `${dia}/${mes}/${ano}`;
+            }
+            return dateStr;
+        } catch (e) {
+            return dateStr || '-';
+        }
+    }
+
+    function formatarDataCurta(dateStr) {
+        if (!dateStr) return '-';
+        try {
+            const d = new Date(dateStr);
+            if (!isNaN(d.getTime())) {
+                const mes = String(d.getUTCMonth() + 1).padStart(2, '0');
+                const ano = d.getUTCFullYear();
+                return `${mes}/${ano}`;
+            }
+            return dateStr;
+        } catch (e) {
+            return dateStr || '-';
+        }
+    }
+
+    // ==========================================
+    // RENDERIZAR TABELA
+    // ==========================================
+
+    function renderizarTabela() {
+        const busca = document.getElementById('filtroBusca').value.toLowerCase().trim();
+        const statusFiltro = document.getElementById('filtroStatus').value;
+        const treinamentoFiltro = document.getElementById('filtroTreinamento').value;
+        
+        if (!colaboradores || !Array.isArray(colaboradores)) {
+            colaboradores = [];
+        }
+        
+        let dadosFiltrados = colaboradores.filter(colab => {
+            if (!colab) return false;
+            const nome = colab.nome || '';
+            const registro = colab.registro || '';
+            const matchBusca = nome.toLowerCase().includes(busca) || registro.toLowerCase().includes(busca);
+            const status = getStatusColaborador(colab.treinamentos);
+            let matchStatus = true;
+            if (statusFiltro !== 'todos') {
+                matchStatus = status.cor === statusFiltro;
+            }
+            let matchTreinamento = true;
+            if (treinamentoFiltro !== 'todos') {
+                matchTreinamento = colab.treinamentos && colab.treinamentos[treinamentoFiltro];
+            }
+            return matchBusca && matchStatus && matchTreinamento;
+        });
+        
+        const corpo = document.getElementById('corpoTabela');
+        
+        if (!dadosFiltrados || dadosFiltrados.length === 0) {
+            corpo.innerHTML = `<tr><td colspan="10"><div class="sem-registros"><div class="icone"></div><p>Nenhum colaborador encontrado.</p><p style="font-size:13px; color:#6b7f94;">Clique em "Adicionar" para começar.</p></div></td></tr>`;
+            atualizarContador([]);
+            return;
+        }
+        
+        let html = '';
+        dadosFiltrados.forEach((colab, index) => {
+            if (!colab) return;
+            
+            const status = getStatusColaborador(colab.treinamentos);
+            const corClasse = `status-${status.cor}`;
+            const textClasse = status.cor;
+            
+            let linhaClasse = '';
+            if (status.cor === 'amarelo') linhaClasse = 'status-atencao';
+            else if (status.cor === 'vermelho') linhaClasse = 'status-inapto';
+            else if (status.cor === 'cinza') linhaClasse = 'status-desligado';
+            else linhaClasse = 'status-apto';
+            
+            const treinamentos = colab.treinamentos || {};
+            
+            const dataASO = treinamentos.ASO ? formatarDataCurta(treinamentos.ASO) : '-';
+            const clsASO = treinamentos.ASO ? getCorData('ASO', treinamentos.ASO) : 'data-cinza';
+            
+            const dataIRATA = treinamentos.IRATA ? formatarDataCurta(treinamentos.IRATA) : '-';
+            const clsIRATA = treinamentos.IRATA ? getCorData('IRATA', treinamentos.IRATA) : 'data-cinza';
+            
+            const dataGWO = treinamentos.GWO ? formatarDataCurta(treinamentos.GWO) : '-';
+            const clsGWO = treinamentos.GWO ? getCorData('GWO', treinamentos.GWO) : 'data-cinza';
+            
+            const dataNRs = treinamentos.NRs ? formatarDataCurta(treinamentos.NRs) : '-';
+            const clsNRs = treinamentos.NRs ? getCorData('NRs', treinamentos.NRs) : 'data-cinza';
+            
+            const dataPassaporte = treinamentos.Passaporte ? formatarDataCurta(treinamentos.Passaporte) : '-';
+            const clsPassaporte = treinamentos.Passaporte ? getCorData('Passaporte', treinamentos.Passaporte) : 'data-cinza';
+            
+            html += `
+                <tr class="${linhaClasse}">
+                    <td>${index + 1}</td>
+                    <td><strong>${escapeHtml(colab.nome) || 'Sem nome'}</strong></td>
+                    <td>${escapeHtml(colab.registro) || '-'}</td>
+                    <td class="${clsASO}">${dataASO}</td>
+                    <td class="${clsIRATA}">${dataIRATA}</td>
+                    <td class="${clsGWO}">${dataGWO}</td>
+                    <td class="${clsNRs}">${dataNRs}</td>
+                    <td class="${clsPassaporte}">${dataPassaporte}</td>
+                    <td>
+                        <span class="status-semaforo ${corClasse}"></span>
+                        <span class="status-texto ${textClasse}">${textoStatusExibicao(status.texto)}</span>
+                    </td>
+                    <td>
+                        <button class="btn-acao btn-registros" onclick="abrirRegistros(${colab.id})" title="Ver todos os registros"></button>
+                        ${podeEditar() ? `<button class="btn-acao btn-editar" onclick="editarColaborador('${colab.id}')"></button>` : ''}
+                        ${podeExcluir() ? `<button class="btn-acao btn-excluir" onclick="excluirColaborador('${colab.id}')"></button>` : ''}
+                    </td>
+                </tr>
+            `;
+        });
+        
+        corpo.innerHTML = html;
+        atualizarContador(dadosFiltrados);
+        atualizarBadge();
+    }
+
+    // ==========================================
+    // CONTADOR
+    // ==========================================
+
+    function atualizarContador(dados) {
+        const total = dados.length;
+        let verdes = 0, amarelos = 0, vermelhos = 0, cinzas = 0;
+        
+        dados.forEach(colab => {
+            const status = getStatusColaborador(colab.treinamentos);
+            if (status.cor === 'verde') verdes++;
+            else if (status.cor === 'amarelo') amarelos++;
+            else if (status.cor === 'vermelho') vermelhos++;
+            else if (status.cor === 'cinza') cinzas++;
+        });
+        
+        const contador = document.getElementById('contador');
+        contador.innerHTML = `
+            <span>Total: <strong>${total}</strong> colaboradores</span>
+            <span><span class="verde">${verdes}</span> ${t('statusApto')}</span>
+            <span><span class="amarelo">${amarelos}</span> ${t('statusAtencao')}</span>
+            <span><span class="vermelho">${vermelhos}</span> ${t('statusInapto')}</span>
+            <span><span style="color: #adb5bd; font-weight: bold;">${cinzas}</span> ${t('statusDesligado')}</span>
+        `;
+    }
+
+    // ==========================================
+    // BADGE E FILTROS
+    // ==========================================
+
+    function atualizarBadge() {
+        const alertas = colaboradores.filter(e => {
+            const status = getStatusColaborador(e.treinamentos);
+            return status.cor === 'amarelo' || status.cor === 'vermelho';
+        });
+        const titulo = document.getElementById('tituloPagina');
+        if (alertas.length > 0) {
+            titulo.textContent = `(${alertas.length}) TrainingFlow`;
+        } else {
+            titulo.textContent = `TrainingFlow`;
+        }
+    }
+
+    function limparFiltros() {
+        document.getElementById('filtroBusca').value = '';
+        document.getElementById('filtroStatus').value = 'todos';
+        document.getElementById('filtroTreinamento').value = 'todos';
+        renderizarTabela();
+    }
+    // ==========================================
+    // MODAL CADASTRO
+    // ==========================================
+
+    function abrirModalAdicionar() {
+        if (!podeEditar()) { alert(t('semPermissaoAdicionar')); return; }
+        document.getElementById('modalTitulo').textContent = t('cadastrarColaborador');
+        document.getElementById('editandoId').value = '';
+        document.getElementById('campoNome').value = '';
+        document.getElementById('campoRegistro').value = '';
+        document.getElementById('campoDrive').value = '';
+        document.getElementById('campoASO').value = '';
+        document.getElementById('campoIRATA').value = '';
+        document.getElementById('campoGWO').value = '';
+        document.getElementById('campoNRs').value = '';
+        document.getElementById('campoPassaporte').value = '';
+        document.getElementById('modalOverlay').classList.add('active');
+    }
+
+    function editarColaborador(id) {
+        if (!podeEditar()) { alert(t('semPermissaoEditar')); return; }
+        const colab = colaboradores.find(e => e.id === id);
+        if (!colab) return;
+        document.getElementById('modalTitulo').textContent = t('editarColaborador');
+        document.getElementById('editandoId').value = id;
+        document.getElementById('campoNome').value = colab.nome || '';
+        document.getElementById('campoRegistro').value = colab.registro || '';
+        document.getElementById('campoDrive').value = colab.driveLink || '';
+        document.getElementById('campoASO').value = colab.treinamentos?.ASO || '';
+        document.getElementById('campoIRATA').value = colab.treinamentos?.IRATA || '';
+        document.getElementById('campoGWO').value = colab.treinamentos?.GWO || '';
+        document.getElementById('campoNRs').value = colab.treinamentos?.NRs || '';
+        document.getElementById('campoPassaporte').value = colab.treinamentos?.Passaporte || '';
+        document.getElementById('modalOverlay').classList.add('active');
+    }
+
+    function fecharModal() {
+        document.getElementById('modalOverlay').classList.remove('active');
+    }
+
+    document.getElementById('modalOverlay').addEventListener('click', function(e) {
+        if (e.target === this) fecharModal();
+    });
+
+    // ==========================================
+    // SALVAR COLABORADOR
+    // ==========================================
+
+    async function salvarColaborador() {
+        if (!podeEditar()) { alert(t('semPermissaoSalvar')); return; }
+        try {
+            console.log('Iniciando salvarColaborador...');
+            
+            const id = document.getElementById('editandoId').value;
+            const nome = document.getElementById('campoNome').value.trim();
+            const registro = document.getElementById('campoRegistro').value.trim();
+            const driveLink = document.getElementById('campoDrive').value.trim();
+
+            console.log('ID:', id, 'Nome:', nome, 'Registro:', registro);
+
+            if (!nome) { alert(t('preencherNomeColaborador')); return; }
+            if (!registro) { alert(t('preencherRegistro')); return; }
+            if (driveLink && !/^https?:\/\//i.test(driveLink)) { alert(t('linkDriveInvalido')); return; }
+
+            const asoAtual = document.getElementById('campoASO').value || '';
+            const irataAtual = document.getElementById('campoIRATA').value || '';
+            const gwoAtual = document.getElementById('campoGWO').value || '';
+            const nrsAtual = document.getElementById('campoNRs').value || '';
+            const passaporteAtual = document.getElementById('campoPassaporte').value || '';
+
+            let treinamentos = {};
+            
+            if (id && id !== '') {
+                const colabExistente = colaboradores.find(c => c.id === id);
+                
+                if (colabExistente) {
+                    console.log('Colaborador existente:', colabExistente);
+                    
+                    treinamentos = {
+                        ASO: asoAtual || colabExistente.treinamentos?.ASO || '',
+                        IRATA: irataAtual || colabExistente.treinamentos?.IRATA || '',
+                        GWO: gwoAtual || colabExistente.treinamentos?.GWO || '',
+                        NRs: nrsAtual || colabExistente.treinamentos?.NRs || '',
+                        Passaporte: passaporteAtual || colabExistente.treinamentos?.Passaporte || ''
+                    };
+                    
+                    console.log('Treinamentos mantidos/atualizados:', treinamentos);
+                } else {
+                    treinamentos = {
+                        ASO: asoAtual,
+                        IRATA: irataAtual,
+                        GWO: gwoAtual,
+                        NRs: nrsAtual,
+                        Passaporte: passaporteAtual
+                    };
+                }
+            } else {
+                treinamentos = {
+                    ASO: asoAtual,
+                    IRATA: irataAtual,
+                    GWO: gwoAtual,
+                    NRs: nrsAtual,
+                    Passaporte: passaporteAtual
+                };
+            }
+
+            const dados = {
+                acao: 'salvarColaborador',
+                nome: nome,
+                registro: registro,
+                driveLink: driveLink || '',
+                treinamentos: treinamentos
+            };
+
+            if (id && id !== '') {
+                dados.id = id;
+                console.log('Editando colaborador ID:', dados.id);
+            } else {
+                console.log('Adicionando novo colaborador');
+            }
+
+            console.log('Dados completos:', dados);
+            
+            const result = await salvarColaboradorAPI(dados);
+            console.log('Resultado:', result);
+
+            if (result && result.success) {
+                fecharModal();
+                alert(t('operacaoSucesso'));
+                await carregarDados();
+            } else {
+                alert(tf('erroSalvar', {erro: result?.error || t('erroDesconhecido')}));
+            }
+        } catch (error) {
+            console.error('Erro em salvarColaborador:', error);
+            alert(tf('erroSalvar', {erro: error.message}));
+        }
+    }
+
+    // ==========================================
+    // EXCLUIR COLABORADOR
+    // ==========================================
+
+    async function excluirColaborador(id) {
+        if (!podeExcluir()) { alert(t('semPermissaoExcluir')); return; }
+        const colab = colaboradores.find(e => e.id === id);
+        if (!colab) return;
+        if (!confirm(tf('confirmExcluirColaborador', {nome: colab.nome}))) return;
+        const result = await excluirColaboradorAPI(id);
+        if (result.success) {
+            alert(t('colaboradorExcluidoSucesso'));
+        } else {
+            alert(tf('erroExcluir', {erro: result.error}));
+        }
+    }
+    // ==========================================
+    // MODAL REGISTROS
+    // ==========================================
+
+    function abrirRegistros(id) {
+        const colab = colaboradores.find(e => e.id === id);
+        if (!colab) return;
+        colaboradorSelecionado = colab;
+
+        document.getElementById('modalRegistrosTitulo').textContent = tf('registrosTitulo', {nome: colab.nome});
+        
+        const container = document.getElementById('conteudoRegistros');
+        let html = '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">';
+        
+        const treinamentos = colab.treinamentos || {};
+        
+        TREINAMENTOS_LISTA.forEach(key => {
+            const data = treinamentos[key];
+            const periodicidade = PERIODICIDADES[key] || 12;
+            const status = data ? getStatusTreinamento(data, periodicidade) : { cor: 'cinza', texto: 'Pendente', diasRestantes: null };
+            const badgeClass = getBadgeClass(status.cor);
+            const dataFormatada = data ? formatarData(data) : '-';
+            const dataVencimento = data ? new Date(new Date(data).setMonth(new Date(data).getMonth() + periodicidade)) : null;
+            const vencimentoFormatado = dataVencimento ? formatarData(dataVencimento.toISOString().slice(0,10)) : '-';
+            
+            const corBorda = status.cor === 'verde' ? '#28a745' : status.cor === 'amarelo' ? '#ffc107' : status.cor === 'vermelho' ? '#dc3545' : '#6c757d';
+            const corTexto = status.cor === 'verde' ? '#28a745' : status.cor === 'amarelo' ? '#ffc107' : status.cor === 'vermelho' ? '#dc3545' : '#6b7f94';
+            
+            html += `
+                <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:6px; border-left:3px solid ${corBorda};">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <strong style="color:#e0e0e0;">${key}</strong>
+                        <span class="${badgeClass}" style="font-size:11px;">${textoStatusExibicao(status.texto)}</span>
+                    </div>
+                    <div style="color:${corTexto}; font-size:13px; margin-top:4px; font-weight:bold;">
+${tf('realizacaoLabel', {data: dataFormatada})}
+                    </div>
+                    <div style="color:#6b7f94; font-size:12px;">
+${tf('venceLabel', {data: vencimentoFormatado, qtd: periodicidade})}
+                        ${status.diasRestantes !== null ? ` | ${tf('diasLabel', {qtd: status.diasRestantes})}` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        
+        html += `
+            <div style="margin-top:15px; padding-top:15px; border-top:1px solid #2c3e50;">
+                <div style="display:flex; gap:20px; flex-wrap:wrap; color:#8ab4d6; font-size:13px;">
+                    <span>${t('colRegistro')}: <strong style="color:#e0e0e0;">${escapeHtml(colab.registro)}</strong></span>
+                    <span>${colab.driveLink ? t('driveConfigurado') : t('driveNaoConfigurado')}</span>
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        document.getElementById('modalRegistrosOverlay').classList.add('active');
+    }
+
+    function fecharModalRegistros() {
+        document.getElementById('modalRegistrosOverlay').classList.remove('active');
+        colaboradorSelecionado = null;
+    }
+
+    function abrirPastaDrive() {
+        if (!colaboradorSelecionado) {
+            alert(t('nenhumColaboradorSelecionado'));
+            return;
+        }
+        const link = (colaboradorSelecionado.driveLink || '').trim();
+        if (link && /^https?:\/\//i.test(link)) {
+            window.open(link, '_blank', 'noopener,noreferrer');
+        } else if (link) {
+            alert(t('semLinkDrive')); // link salvo não é http(s) válido — não abre
+        } else {
+            alert(t('semLinkDrive'));
+        }
+    }
+
+    document.getElementById('modalRegistrosOverlay').addEventListener('click', function(e) {
+        if (e.target === this) fecharModalRegistros();
+    });
+    // ==========================================
+    // EXPORTAR DADOS (EXCELJS)
+    // ==========================================
+
+    // carregarScript(), garantirExcelJS() e garantirChartJS() agora vêm do shared.js
+
+    async function exportarDados() {
+        await garantirExcelJS();
+        const busca = document.getElementById('filtroBusca').value.toLowerCase().trim();
+        const statusFiltro = document.getElementById('filtroStatus').value;
+        const treinamentoFiltro = document.getElementById('filtroTreinamento').value;
+
+        let dadosFiltrados = colaboradores.filter(colab => {
+            const matchBusca = colab.nome.toLowerCase().includes(busca) || colab.registro.toLowerCase().includes(busca);
+            const status = getStatusColaborador(colab.treinamentos);
+            let matchStatus = true;
+            if (statusFiltro !== 'todos') {
+                matchStatus = status.cor === statusFiltro;
+            }
+            let matchTreinamento = true;
+            if (treinamentoFiltro !== 'todos') {
+                matchTreinamento = colab.treinamentos && colab.treinamentos[treinamentoFiltro];
+            }
+            return matchBusca && matchStatus && matchTreinamento;
+        });
+
+        if (dadosFiltrados.length === 0) {
+            alert(t('nenhumColaboradorExportar'));
+            return;
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'EHS - Controle de Qualificação';
+        workbook.created = new Date();
+
+        const wsLista = workbook.addWorksheet('Colaboradores');
+
+        wsLista.columns = [
+            { header: 'ID', key: 'id', width: 8 },
+            { header: t('colNome'), key: 'nome', width: 30 },
+            { header: t('colRegistro'), key: 'registro', width: 15 },
+            { header: 'ASO', key: 'aso', width: 15 },
+            { header: 'IRATA', key: 'irata', width: 15 },
+            { header: 'GWO', key: 'gwo', width: 15 },
+            { header: "NR's", key: 'nrs', width: 15 },
+            { header: 'Passaporte', key: 'passaporte', width: 15 },
+            { header: t('colStatus'), key: 'status', width: 15 },
+            { header: t('colDrive'), key: 'drive', width: 50 }
+        ];
+
+        dadosFiltrados.forEach(e => {
+            const status = getStatusColaborador(e.treinamentos);
+            const row = wsLista.addRow({
+                id: e.id,
+                nome: e.nome,
+                registro: e.registro,
+                aso: e.treinamentos?.ASO ? formatarData(e.treinamentos.ASO) : '-',
+                irata: e.treinamentos?.IRATA ? formatarData(e.treinamentos.IRATA) : '-',
+                gwo: e.treinamentos?.GWO ? formatarData(e.treinamentos.GWO) : '-',
+                nrs: e.treinamentos?.NRs ? formatarData(e.treinamentos.NRs) : '-',
+                passaporte: e.treinamentos?.Passaporte ? formatarData(e.treinamentos.Passaporte) : '-',
+                status: textoStatusExibicao(status.texto),
+                drive: e.driveLink || '-'
+            });
+
+            const statusCor = status.cor === 'verde' ? 'FFC6EFCE' :
+                             status.cor === 'amarelo' ? 'FFFFEB9C' :
+                             'FFFF9B9B';
+
+            row.eachCell((cell) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: statusCor }
+                };
+                cell.alignment = { vertical: 'middle', horizontal: 'left' };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+                    left: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+                    bottom: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+                    right: { style: 'thin', color: { argb: 'FFD0D0D0' } }
+                };
+            });
+        });
+
+        const headerRow = wsLista.getRow(1);
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        headerRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF2C3E50' }
+        };
+        headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+        headerRow.height = 25;
+
+        headerRow.eachCell((cell) => {
+            cell.border = {
+                top: { style: 'medium', color: { argb: 'FF1A252F' } },
+                left: { style: 'medium', color: { argb: 'FF1A252F' } },
+                bottom: { style: 'medium', color: { argb: 'FF1A252F' } },
+                right: { style: 'medium', color: { argb: 'FF1A252F' } }
+            };
+        });
+
+        wsLista.views = [{ state: 'frozen', ySplit: 1 }];
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+        const dataAtual = new Date().toISOString().slice(0, 10);
+        saveAs(blob, `ehs_colaboradores_${dataAtual}.xlsx`);
+    }
+
+    // ==========================================
+    // IMPORTAR DADOS
+    // ==========================================
+
+    function importarDados() {
+        if (!podeEditar()) { alert(t('semPermissaoImportar')); return; }
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(event) {
+                try {
+                    const dados = JSON.parse(event.target.result);
+                    if (!Array.isArray(dados)) {
+                        alert(t('arquivoInvalido'));
+                        return;
+                    }
+                    if (!confirm(tf('confirmImportar', {qtd: dados.length})))
+                        return;
+
+                    for (const colab of dados) {
+                        const salvarDados = {
+                            acao: 'salvarColaborador',
+                            nome: colab.nome,
+                            registro: colab.registro,
+                            driveLink: colab.driveLink || '',
+                            treinamentos: colab.treinamentos || {}
+                        };
+                        if (colab.id) salvarDados.id = colab.id;
+                        await salvarColaboradorAPI(salvarDados);
+                    }
+
+                    await carregarDados();
+                    alert(t('importacaoSucesso'));
+                } catch (err) {
+                    alert(t('erroLerArquivo'));
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    }
+
+    // ==========================================
+    // SINCRONIZAR
+    // ==========================================
+
+    async function sincronizarGoogleSheets() {
+        const loading = document.createElement('div');
+        loading.textContent = 'Sincronizando...';
+        loading.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#1b263b; color:white; padding:20px 40px; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.5); z-index:9999; font-size:18px; border:1px solid #2c3e50;';
+        document.body.appendChild(loading);
+
+        try {
+            await carregarDados();
+            alert(t('dadosSincronizadosSucesso'));
+        } catch (error) {
+            alert(tf('erroSincronizar', {erro: error.message}));
+        } finally {
+            loading.remove();
+        }
+    }
+    // ==========================================
+    // DASHBOARD - CHART.JS
+    // ==========================================
+
+    let chartStatus = null;
+    let chartPareto = null;
+    let chartColaboradores = null;
+    let chartEvolucao = null;
+
+    async function abrirDashboard() {
+        await garantirChartJS();
+        const modal = document.getElementById('dashboardModal');
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => {
+            atualizarDashboard();
+        }, 300);
+    }
+
+    function fecharDashboard() {
+        document.getElementById('dashboardModal').classList.remove('active');
+        document.body.style.overflow = 'auto';
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            fecharDashboard();
+        }
+    });
+
+    function atualizarDashboard() {
+        const busca = document.getElementById('filtroBuscaDash').value.toLowerCase().trim();
+        const statusFiltro = document.getElementById('filtroStatusDash').value;
+        
+        let dadosFiltrados = colaboradores.filter(colab => {
+            const matchBusca = colab.nome.toLowerCase().includes(busca) || 
+                              colab.registro.toLowerCase().includes(busca);
+            const status = getStatusColaborador(colab.treinamentos);
+            let matchStatus = true;
+            if (statusFiltro !== 'todos') {
+                matchStatus = status.cor === statusFiltro;
+            }
+            return matchBusca && matchStatus;
+        });
+        
+        document.getElementById('totalDashboard').textContent = dadosFiltrados.length;
+        document.getElementById('infoDashboard').textContent = 
+            `${dadosFiltrados.length} colaboradores | Filtros aplicados`;
+        
+        gerarGraficoStatus(dadosFiltrados);
+        gerarGraficoPareto(dadosFiltrados);
+        gerarGraficoColaboradores(dadosFiltrados);
+        gerarGraficoEvolucao(dadosFiltrados);
+    }
+
+    function gerarGraficoStatus(dados) {
+        const ctx = document.getElementById('graficoStatus').getContext('2d');
+        
+        const contagem = { 
+            'APTO': 0, 
+            'ATENÇÃO': 0, 
+            'INAPTO': 0,
+            'DESLIGADO': 0 
+        };
+        
+        dados.forEach(e => {
+            const status = getStatusColaborador(e.treinamentos);
+            contagem[status.texto] = (contagem[status.texto] || 0) + 1;
+        });
+        
+        const labels = Object.keys(contagem).map(k => textoStatusExibicao(k));
+        const values = Object.values(contagem);
+        const cores = ['#28a745', '#ffc107', '#dc3545', '#6c757d'];
+        
+        if (chartStatus) chartStatus.destroy();
+        chartStatus = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: cores,
+                    borderColor: '#0d1b2a',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            color: '#e0e0e0'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function gerarGraficoPareto(dados) {
+        const ctx = document.getElementById('graficoPareto').getContext('2d');
+        
+        // Contar treinamentos vencidos
+        const vencidos = {};
+        dados.forEach(colab => {
+            const treinamentos = colab.treinamentos || {};
+            TREINAMENTOS_LISTA.forEach(key => {
+                const data = treinamentos[key];
+                if (data) {
+                    const status = getStatusTreinamento(data, PERIODICIDADES[key]);
+                    if (status.cor === 'vermelho') {
+                        vencidos[key] = (vencidos[key] || 0) + 1;
+                    }
+                }
+            });
+        });
+        
+        const labels = Object.keys(vencidos).sort((a, b) => vencidos[b] - vencidos[a]);
+        const values = labels.map(key => vencidos[key]);
+        const cores = ['#dc3545', '#e74c3c', '#f1948a', '#f5b7b1'];
+        
+        if (chartPareto) chartPareto.destroy();
+        chartPareto = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Treinamentos Vencidos',
+                    data: values,
+                    backgroundColor: cores.slice(0, labels.length),
+                    borderColor: '#dc3545',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, color: '#8ab4d6' },
+                        grid: { color: 'rgba(255,255,255,0.05)' }
+                    },
+                    x: {
+                        ticks: { color: '#8ab4d6' }
+                    }
+                }
+            }
+        });
+    }
+
+    function gerarGraficoColaboradores(dados) {
+        const ctx = document.getElementById('graficoColaboradores').getContext('2d');
+        const dadosLimitados = dados.slice(0, 15);
+        const nomes = dadosLimitados.map(e => e.nome);
+        const statusList = dadosLimitados.map(e => {
+            const status = getStatusColaborador(e.treinamentos);
+            return status.texto;
+        });
+        const cores = statusList.map(s => 
+            s === 'APTO' ? '#28a745' : 
+            s === 'ATENÇÃO' ? '#ffc107' : 
+            s === 'INAPTO' ? '#dc3545' :
+            s === 'DESLIGADO' ? '#6c757d' : '#6c757d'
+        );
+        
+        if (chartColaboradores) chartColaboradores.destroy();
+        chartColaboradores = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: nomes,
+                datasets: [{
+                    label: 'Status',
+                    data: statusList.map((_, i) => i + 1),
+                    backgroundColor: cores,
+                    borderColor: cores.map(c => c),
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const index = context.dataIndex;
+                                return textoStatusExibicao(statusList[index]) || t('colStatus');
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { 
+                            stepSize: 1, 
+                            color: '#8ab4d6',
+                            display: false
+                        },
+                        grid: { display: false }
+                    },
+                    x: {
+                        ticks: { color: '#8ab4d6', maxRotation: 45, font: { size: 10 } }
+                    }
+                }
+            }
+        });
+    }
+
+    function gerarGraficoEvolucao(dados) {
+        const ctx = document.getElementById('graficoEvolucao').getContext('2d');
+        
+        // Agrupar por mês de cadastro (usando ID como proxy)
+        const meses = {};
+        dados.forEach(e => {
+            if (e.id) {
+                // Usar data atual como referência para evolução
+                const hoje = new Date();
+                const mes = `${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`;
+                meses[mes] = (meses[mes] || 0) + 1;
+            }
+        });
+        
+        const labels = Object.keys(meses).sort();
+        const values = labels.map(label => meses[label]);
+        // Acumular valores
+        let acumulado = 0;
+        const valoresAcumulados = values.map(v => { acumulado += v; return acumulado; });
+        
+        if (chartEvolucao) chartEvolucao.destroy();
+        chartEvolucao = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Acumulado',
+                    data: valoresAcumulados,
+                    borderColor: '#48cae4',
+                    backgroundColor: 'rgba(72, 202, 228, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3,
+                    pointBackgroundColor: '#48cae4',
+                    pointBorderColor: '#0d1b2a',
+                    pointBorderWidth: 2,
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, color: '#8ab4d6' },
+                        grid: { color: 'rgba(255,255,255,0.05)' }
+                    },
+                    x: {
+                        ticks: { color: '#8ab4d6' }
+                    }
+                }
+            }
+        });
+    }
+
+    function exportarDashboard() {
+        const container = document.querySelector('.dashboard-container');
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+        script.onload = function() {
+            html2canvas(container, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#1b263b',
+                allowTaint: true,
+                logging: false
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `dashboard_ehs_${new Date().toISOString().slice(0,10)}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+        };
+        script.onerror = function() {
+            alert(t('erroGerarImagem'));
+        };
+        document.body.appendChild(script);
+    }
+    // ==========================================
+    // INICIALIZAÇÃO
+    // ==========================================
+
+    function init() {
+        carregarDoLocalStorage();
+        carregarStatusAnteriorEHS();
+        renderizarTabela();
+
+        // ==========================================
+        // CARREGAR DADOS DA API
+        // ==========================================
+        setTimeout(function() {
+            carregarDados();
+            
+            setTimeout(() => {
+                verificarAlertasAbrirEHS();
+            }, 1500);
+            
+            setTimeout(() => {
+                verificarMudancasStatusEHS();
+            }, 2000);
+            
+        }, 1000);
+    }
+
+    // CORREÇÃO: carregarDados (estava escrito carregarDatos)
+    // A função já existe como carregarDados, então o setTimeout deve chamar carregarDados
+
+   document.addEventListener('DOMContentLoaded', async function() {
+    aplicarIdioma();
+    const acessoLiberado = await validarAcessoFlowsuite();
+    if (!acessoLiberado) {
+        bloquearAcesso();
+        return;
+    }
+    init();
+    aplicarPermissoesNaTela();
+    iniciarRevalidacaoPeriodicaSessao();
+});
+
+// iniciarRevalidacaoPeriodicaSessao() agora vem do shared.js (padrão 15s,
+// chama validarAcessoFlowsuite()/bloquearAcesso() daqui automaticamente)
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            fecharModal();
+            fecharModalRegistros();
+        }
+    });
+
+    // ==========================================
+    // EXPORTAÇÕES GLOBAIS
+    // ==========================================
+
+    window.abrirModalAdicionar = abrirModalAdicionar;
+    window.editarColaborador = editarColaborador;
+    window.excluirColaborador = excluirColaborador;
+    window.salvarColaborador = salvarColaborador;
+    window.fecharModal = fecharModal;
+    window.abrirRegistros = abrirRegistros;
+    window.fecharModalRegistros = fecharModalRegistros;
+    window.abrirPastaDrive = abrirPastaDrive;
+    window.exportarDados = exportarDados;
+    window.importarDados = importarDados;
+    window.limparFiltros = limparFiltros;
+    window.sincronizarGoogleSheets = sincronizarGoogleSheets;
+    window.renderizarTabela = renderizarTabela;
+    window.abrirDashboard = abrirDashboard;
+    window.fecharDashboard = fecharDashboard;
+    window.atualizarDashboard = atualizarDashboard;
+    window.exportarDashboard = exportarDashboard;
+
+    // ==========================================
+    // EXPORTAÇÕES DE E-MAIL (para console)
+    // ==========================================
+
+    window.enviarEmailAlertasEHS = enviarEmailAlertasEHS;
+    window.testarEnvioEmailEHS = testarEnvioEmailEHS;
+    window.resetarControleEmailEHS = resetarControleEmailEHS;
+    window.verificarMudancasStatusEHS = verificarMudancasStatusEHS;
+    window.dispararEmailAutomaticoEHS = dispararEmailAutomaticoEHS;
+    window.colaboradores = colaboradores;
+
+    console.log('Sistema de alertas por e-mail ativado! (EHS)');
+    console.log('Comandos disponíveis:');
+    console.log(' - testarEnvioEmailEHS() → Envia e-mail de teste');
+    console.log(' - resetarControleEmailEHS() → Remove marcação "já enviado hoje"');
+    console.log(' - verificarMudancasStatusEHS() → Força verificação de mudanças');
+
+    // ==========================================
+    // FIM DO CÓDIGO
+    // ==========================================
+</script>
+
+</body>
+</html>
