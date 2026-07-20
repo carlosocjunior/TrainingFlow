@@ -600,6 +600,7 @@
             <thead>
                 <tr>
                     <th data-i18n="colNum">#</th>
+                    <th id="thColEmpresa" style="display:none;" data-i18n="colEmpresa">Empresa</th>
                     <th data-i18n="colNome">Nome</th>
                     <th data-i18n="colRegistro">Registro</th>
                     <th>ASO</th>
@@ -788,6 +789,7 @@
             statusVencido: 'Vencido',
             statusValido: 'Válido',
             colNum: '#',
+            colEmpresa: 'Empresa',
             colNome: 'Nome',
             colRegistro: 'Registro',
             colStatus: 'Status',
@@ -886,6 +888,7 @@
             statusVencido: 'Expired',
             statusValido: 'Valid',
             colNum: '#',
+            colEmpresa: 'Company',
             colNome: 'Name',
             colRegistro: 'ID',
             colStatus: 'Status',
@@ -984,6 +987,7 @@
             statusVencido: 'Vencido',
             statusValido: 'Válido',
             colNum: '#',
+            colEmpresa: 'Empresa',
             colNome: 'Nombre',
             colRegistro: 'Registro',
             colStatus: 'Estado',
@@ -1127,8 +1131,9 @@
     function aplicarPermissoesNaTela() {
         const btnAdicionar = document.getElementById('btnAdicionar');
         const btnImportar = document.getElementById('btnImportar');
-        if (btnAdicionar) btnAdicionar.style.display = podeEditar() ? '' : 'none';
-        if (btnImportar) btnImportar.style.display = podeEditar() ? '' : 'none';
+        const podeMexer = podeEditar() && empresaIdAtual !== 'todas';
+        if (btnAdicionar) btnAdicionar.style.display = podeMexer ? '' : 'none';
+        if (btnImportar) btnImportar.style.display = podeMexer ? '' : 'none';
     }
 
     // ==========================================
@@ -1746,7 +1751,8 @@
         const corpo = document.getElementById('corpoTabela');
         
         if (!dadosFiltrados || dadosFiltrados.length === 0) {
-            corpo.innerHTML = `<tr><td colspan="10"><div class="sem-registros"><div class="icone"></div><p>Nenhum colaborador encontrado.</p><p style="font-size:13px; color:#6b7f94;">Clique em "Adicionar" para começar.</p></div></td></tr>`;
+            const colspanVazio = empresaIdAtual === 'todas' ? 11 : 10;
+            corpo.innerHTML = `<tr><td colspan="${colspanVazio}"><div class="sem-registros"><div class="icone"></div><p>Nenhum colaborador encontrado.</p><p style="font-size:13px; color:#6b7f94;">Clique em "Adicionar" para começar.</p></div></td></tr>`;
             atualizarContador([]);
             return;
         }
@@ -1782,9 +1788,15 @@
             const dataPassaporte = treinamentos.Passaporte ? formatarDataCurta(treinamentos.Passaporte) : '-';
             const clsPassaporte = treinamentos.Passaporte ? getCorData('Passaporte', treinamentos.Passaporte) : 'data-cinza';
             
+            const modoTodasEmpresas = empresaIdAtual === 'todas';
+            const celulaEmpresa = modoTodasEmpresas
+                ? `<td>${escapeHtml(colab.empresaCodigo || colab.empresaNome || '-')}</td>`
+                : '';
+
             html += `
                 <tr class="${linhaClasse}">
                     <td>${index + 1}</td>
+                    ${celulaEmpresa}
                     <td><strong>${escapeHtml(colab.nome) || 'Sem nome'}</strong></td>
                     <td>${escapeHtml(colab.registro) || '-'}</td>
                     <td class="${clsASO}">${dataASO}</td>
@@ -1798,14 +1810,16 @@
                     </td>
                     <td>
                         <button class="btn-acao btn-registros" onclick="abrirRegistros(${colab.id})" title="Ver todos os registros"></button>
-                        ${podeEditar() ? `<button class="btn-acao btn-editar" onclick="editarColaborador('${colab.id}')"></button>` : ''}
-                        ${podeExcluir() ? `<button class="btn-acao btn-excluir" onclick="excluirColaborador('${colab.id}')"></button>` : ''}
+                        ${(!modoTodasEmpresas && podeEditar()) ? `<button class="btn-acao btn-editar" onclick="editarColaborador('${colab.id}')"></button>` : ''}
+                        ${(!modoTodasEmpresas && podeExcluir()) ? `<button class="btn-acao btn-excluir" onclick="excluirColaborador('${colab.id}')"></button>` : ''}
                     </td>
                 </tr>
             `;
         });
         
         corpo.innerHTML = html;
+        const thEmpresa = document.getElementById('thColEmpresa');
+        if (thEmpresa) thEmpresa.style.display = (empresaIdAtual === 'todas') ? '' : 'none';
         atualizarContador(dadosFiltrados);
         atualizarBadge();
     }
