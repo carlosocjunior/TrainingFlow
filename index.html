@@ -564,7 +564,7 @@
             <button class="btn btn-importar" id="btnImportar" onclick="importarDados()" data-i18n="importarBtn">Importar</button>
             <button class="btn btn-limpar" onclick="limparFiltros()" data-i18n="limparFiltrosBtn">Limpar Filtros</button>
             <button class="btn btn-sync" onclick="sincronizarGoogleSheets()" data-i18n="sincronizarBtn">Sincronizar</button>
-            <button class="btn btn-dashboard" onclick="abrirDashboard()" data-i18n="dashboardBtn">Dashboard</button>
+            <button class="btn btn-dashboard" id="btnDashboard" onclick="abrirDashboard()" data-i18n="dashboardBtn">Dashboard</button>
         </div>
     </div>
 
@@ -827,6 +827,7 @@
             registrosTitulo: 'Registros - {nome}',
             abrirPastaDriveBtn: 'Abrir Pasta Drive',
             fecharBtn: 'Fechar',
+            semAcessoDashboard: 'Você não tem permissão para acessar o Dashboard.',
             realizacaoLabel: 'Realização: {data}',
             venceLabel: 'Vence: {data} ({qtd} meses)',
             diasLabel: '{qtd} dias',
@@ -926,6 +927,7 @@
             registrosTitulo: 'Records - {nome}',
             abrirPastaDriveBtn: 'Open Drive Folder',
             fecharBtn: 'Close',
+            semAcessoDashboard: 'You do not have permission to access the Dashboard.',
             realizacaoLabel: 'Completed on: {data}',
             venceLabel: 'Expires: {data} ({qtd} months)',
             diasLabel: '{qtd} days',
@@ -1025,6 +1027,7 @@
             registrosTitulo: 'Registros - {nome}',
             abrirPastaDriveBtn: 'Abrir Carpeta Drive',
             fecharBtn: 'Cerrar',
+            semAcessoDashboard: 'No tiene permiso para acceder al Dashboard.',
             realizacaoLabel: 'Realización: {data}',
             venceLabel: 'Vence: {data} ({qtd} meses)',
             diasLabel: '{qtd} días',
@@ -1145,9 +1148,11 @@
     function aplicarPermissoesNaTela() {
         const btnAdicionar = document.getElementById('btnAdicionar');
         const btnImportar = document.getElementById('btnImportar');
+        const btnDashboard = document.getElementById('btnDashboard');
         const podeMexer = podeEditar() && empresaIdAtual !== 'todas';
         if (btnAdicionar) btnAdicionar.style.display = podeMexer ? '' : 'none';
         if (btnImportar) btnImportar.style.display = podeMexer ? '' : 'none';
+        if (btnDashboard) btnDashboard.style.display = podeVerDashboard() ? '' : 'none';
     }
 
     // ==========================================
@@ -2314,6 +2319,10 @@ ${tf('venceLabel', {data: vencimentoFormatado, qtd: periodicidade})}
     let chartEvolucao = null;
 
     async function abrirDashboard() {
+        if (!podeVerDashboard()) {
+            alert(t('semAcessoDashboard'));
+            return;
+        }
         await garantirChartJS();
         const modal = document.getElementById('dashboardModal');
         modal.classList.add('active');
