@@ -542,10 +542,9 @@
 <div class="container">
     <!-- CABEÇALHO -->
     <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 5px;">
-    <div style="font-family: Arial, sans-serif; line-height: 1.1; text-align: center; padding: 4px 12px; border-right: 2px solid #00b4d8;">
-        <div style="font-size: 22px; font-weight: 900; color: #00b4d8; letter-spacing: 1px;">SYNVORA</div>
-        <div style="font-size: 14px; font-weight: 700; color: #e0e0e0; letter-spacing: 2px;">LABS</div>
-        <div style="font-size: 9px; font-weight: 600; color: #8ab4d6; letter-spacing: 1px;">SMARTOPERATIONSPLATFORM</div>
+    <div style="font-family: Arial, sans-serif; line-height: 1.1; text-align: center; padding: 4px 12px; border-right: 2px solid #00b4d8; display:flex; flex-direction:column; align-items:center;">
+        <img src="logo-synvora.png" alt="Synvora Labs" style="width:50px; height:auto; margin-bottom:2px; filter: brightness(0) invert(1);">
+        <div style="font-size: 9px; font-weight: 400; color: #8ab4d6;">Smart Operations Platform</div>
     </div>
     <div>
         <h1 id="tituloPagina" style="margin: 0;">TrainingFlow</h1>
@@ -745,6 +744,21 @@
 </div>
 
 <script>
+    // ==========================================
+    // FECHAR MODAIS COM CLIQUE FORA OU ESC
+    // (aqui, "active" é a classe que MOSTRA a janela)
+    // ==========================================
+    document.addEventListener('click', function (evento) {
+        if (evento.target.classList && evento.target.classList.contains('modal-overlay') && evento.target.classList.contains('active')) {
+            evento.target.classList.remove('active');
+        }
+    });
+    document.addEventListener('keydown', function (evento) {
+        if (evento.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+        }
+    });
+
     // ==========================================
     // CONFIGURAÇÃO DA API
     // ==========================================
