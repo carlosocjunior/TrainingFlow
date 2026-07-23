@@ -1842,7 +1842,7 @@
                         <span class="status-texto ${textClasse}">${textoStatusExibicao(status.texto)}</span>
                     </td>
                     <td>
-                        <button class="btn-acao btn-registros" onclick="abrirRegistros(${colab.id})" title="Ver todos os registros"></button>
+                        <button class="btn-acao btn-registros" onclick="abrirRegistros('${colab.id}')" title="Ver todos os registros"></button>
                         ${(!modoTodasEmpresas && podeEditar()) ? `<button class="btn-acao btn-editar" onclick="editarColaborador('${colab.id}')"></button>` : ''}
                         ${(!modoTodasEmpresas && podeExcluir()) ? `<button class="btn-acao btn-excluir" onclick="excluirColaborador('${colab.id}')"></button>` : ''}
                     </td>
