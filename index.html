@@ -686,6 +686,11 @@
         <button class="fechar" onclick="fecharModalRegistros()">×</button>
         <h2 id="modalRegistrosTitulo">Registros - Colaborador</h2>
         <div id="conteudoRegistros" style="margin-top: 15px;"></div>
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #2c3e50;">
+            <label style="font-size:13px; color:#8ab4d6; display:block; margin-bottom:6px;" data-i18n="enviarArquivoLabel">Enviar arquivo (contrato, certificado, atestado...)</label>
+            <input type="file" id="inputRegistroArquivo" style="width:100%;">
+            <div id="statusUploadRegistro" style="font-size:12px; margin-top:6px; color:#8ab4d6;"></div>
+        </div>
         <div style="margin-top: 20px; display: flex; gap:10px;">
             <button class="btn btn-drive" onclick="abrirPastaDrive()" style="flex:1;" data-i18n="abrirPastaDriveBtn">Abrir Pasta Drive</button>
             <button class="btn btn-registros" onclick="fecharModalRegistros()" style="flex:1;" data-i18n="fecharBtn">Fechar</button>
@@ -826,6 +831,10 @@
             salvarBtn: 'Salvar',
             registrosTitulo: 'Registros - {nome}',
             abrirPastaDriveBtn: 'Abrir Pasta Drive',
+            enviarArquivoLabel: 'Enviar arquivo (contrato, certificado, atestado...)',
+            enviandoArquivo: 'Enviando...',
+            arquivoEnviadoSucesso: 'Arquivo enviado com sucesso!',
+            erroEnviarArquivo: 'Erro ao enviar arquivo.',
             fecharBtn: 'Fechar',
             semAcessoDashboard: 'Você não tem permissão para acessar o Dashboard.',
             realizacaoLabel: 'Realização: {data}',
@@ -926,6 +935,10 @@
             salvarBtn: 'Save',
             registrosTitulo: 'Records - {nome}',
             abrirPastaDriveBtn: 'Open Drive Folder',
+            enviarArquivoLabel: 'Upload file (contract, certificate, medical clearance...)',
+            enviandoArquivo: 'Uploading...',
+            arquivoEnviadoSucesso: 'File uploaded successfully!',
+            erroEnviarArquivo: 'Error uploading file.',
             fecharBtn: 'Close',
             semAcessoDashboard: 'You do not have permission to access the Dashboard.',
             realizacaoLabel: 'Completed on: {data}',
@@ -1026,6 +1039,10 @@
             salvarBtn: 'Guardar',
             registrosTitulo: 'Registros - {nome}',
             abrirPastaDriveBtn: 'Abrir Carpeta Drive',
+            enviarArquivoLabel: 'Enviar archivo (contrato, certificado, aptitud médica...)',
+            enviandoArquivo: 'Enviando...',
+            arquivoEnviadoSucesso: '¡Archivo enviado con éxito!',
+            erroEnviarArquivo: 'Error al enviar el archivo.',
             fecharBtn: 'Cerrar',
             semAcessoDashboard: 'No tiene permiso para acceder al Dashboard.',
             realizacaoLabel: 'Realización: {data}',
@@ -2126,6 +2143,57 @@ ${tf('venceLabel', {data: vencimentoFormatado, qtd: periodicidade})}
             alert(t('semLinkDrive'));
         }
     }
+
+    // Envia o arquivo escolhido pro Drive, na pasta do colaborador
+    // (criada automaticamente se ainda não existir).
+    document.getElementById('inputRegistroArquivo').addEventListener('change', async function (evento) {
+        const arquivo = evento.target.files[0];
+        if (!arquivo || !colaboradorSelecionado) return;
+
+        const status = document.getElementById('statusUploadRegistro');
+        status.style.color = '#8ab4d6';
+        status.textContent = t('enviandoArquivo');
+
+        const reader = new FileReader();
+        reader.onload = async function (ev) {
+            try {
+                const resposta = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        acao: 'uploadRegistroColaborador',
+                        token: getTokenDaURL(),
+                        empresaId: empresaIdAtual,
+                        colaboradorId: colaboradorSelecionado.id,
+                        arquivoBase64: ev.target.result,
+                        nomeArquivo: arquivo.name
+                    })
+                });
+                const resultado = await resposta.json();
+
+                if (resultado.success) {
+                    status.style.color = '#28a745';
+                    status.textContent = t('arquivoEnviadoSucesso');
+
+                    if (!colaboradorSelecionado.driveLink && resultado.pastaLink) {
+                        colaboradorSelecionado.driveLink = resultado.pastaLink;
+                        const idx = colaboradores.findIndex(c => c.id === colaboradorSelecionado.id);
+                        if (idx >= 0) colaboradores[idx].driveLink = resultado.pastaLink;
+                        salvarNoLocalStorage();
+                        abrirRegistros(colaboradorSelecionado.id); // re-renderiza pra mostrar "Drive configurado"
+                    }
+                    document.getElementById('inputRegistroArquivo').value = '';
+                } else {
+                    status.style.color = '#dc3545';
+                    status.textContent = resultado.error || t('erroEnviarArquivo');
+                }
+            } catch (err) {
+                status.style.color = '#dc3545';
+                status.textContent = t('erroEnviarArquivo');
+            }
+        };
+        reader.readAsDataURL(arquivo);
+    });
 
     document.getElementById('modalRegistrosOverlay').addEventListener('click', function(e) {
         if (e.target === this) fecharModalRegistros();
