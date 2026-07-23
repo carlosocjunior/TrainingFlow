@@ -684,13 +684,16 @@
         <h2 id="modalRegistrosTitulo">Registros - Colaborador</h2>
         <div id="conteudoRegistros" style="margin-top: 15px;"></div>
         <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #2c3e50;">
+            <label style="font-size:13px; color:#8ab4d6; display:block; margin-bottom:6px;" data-i18n="arquivosEnviadosLabel">Arquivos enviados</label>
+            <div id="listaArquivosRegistro" style="font-size:13px;"></div>
+        </div>
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #2c3e50;">
             <label style="font-size:13px; color:#8ab4d6; display:block; margin-bottom:6px;" data-i18n="enviarArquivoLabel">Enviar arquivo (contrato, certificado, atestado...)</label>
             <input type="file" id="inputRegistroArquivo" style="width:100%;">
             <div id="statusUploadRegistro" style="font-size:12px; margin-top:6px; color:#8ab4d6;"></div>
         </div>
-        <div style="margin-top: 20px; display: flex; gap:10px;">
-            <button class="btn btn-drive" onclick="abrirPastaDrive()" style="flex:1;" data-i18n="abrirPastaDriveBtn">Abrir Pasta Drive</button>
-            <button class="btn btn-registros" onclick="fecharModalRegistros()" style="flex:1;" data-i18n="fecharBtn">Fechar</button>
+        <div style="margin-top: 20px;">
+            <button class="btn btn-registros" onclick="fecharModalRegistros()" style="width:100%;" data-i18n="fecharBtn">Fechar</button>
         </div>
     </div>
 </div>
@@ -829,6 +832,10 @@
             registrosTitulo: 'Registros - {nome}',
             abrirPastaDriveBtn: 'Abrir Pasta Drive',
             enviarArquivoLabel: 'Enviar arquivo (contrato, certificado, atestado...)',
+            arquivosEnviadosLabel: 'Arquivos enviados',
+            carregandoArquivos: 'Carregando...',
+            erroCarregarArquivos: 'Erro ao carregar arquivos.',
+            nenhumArquivoEnviado: 'Nenhum arquivo enviado ainda.',
             enviandoArquivo: 'Enviando...',
             arquivoEnviadoSucesso: 'Arquivo enviado com sucesso!',
             erroEnviarArquivo: 'Erro ao enviar arquivo.',
@@ -933,6 +940,10 @@
             registrosTitulo: 'Records - {nome}',
             abrirPastaDriveBtn: 'Open Drive Folder',
             enviarArquivoLabel: 'Upload file (contract, certificate, medical clearance...)',
+            arquivosEnviadosLabel: 'Uploaded files',
+            carregandoArquivos: 'Loading...',
+            erroCarregarArquivos: 'Error loading files.',
+            nenhumArquivoEnviado: 'No files uploaded yet.',
             enviandoArquivo: 'Uploading...',
             arquivoEnviadoSucesso: 'File uploaded successfully!',
             erroEnviarArquivo: 'Error uploading file.',
@@ -1037,6 +1048,10 @@
             registrosTitulo: 'Registros - {nome}',
             abrirPastaDriveBtn: 'Abrir Carpeta Drive',
             enviarArquivoLabel: 'Enviar archivo (contrato, certificado, aptitud médica...)',
+            arquivosEnviadosLabel: 'Archivos enviados',
+            carregandoArquivos: 'Cargando...',
+            erroCarregarArquivos: 'Error al cargar archivos.',
+            nenhumArquivoEnviado: 'Ningún archivo enviado todavía.',
             enviandoArquivo: 'Enviando...',
             arquivoEnviadoSucesso: '¡Archivo enviado con éxito!',
             erroEnviarArquivo: 'Error al enviar el archivo.',
@@ -2112,13 +2127,13 @@ ${tf('venceLabel', {data: vencimentoFormatado, qtd: periodicidade})}
             <div style="margin-top:15px; padding-top:15px; border-top:1px solid #2c3e50;">
                 <div style="display:flex; gap:20px; flex-wrap:wrap; color:#8ab4d6; font-size:13px;">
                     <span>${t('colRegistro')}: <strong style="color:#e0e0e0;">${escapeHtml(colab.registro)}</strong></span>
-                    <span>${colab.driveLink ? t('driveConfigurado') : t('driveNaoConfigurado')}</span>
                 </div>
             </div>
         `;
         
         container.innerHTML = html;
         document.getElementById('modalRegistrosOverlay').classList.add('active');
+        carregarListaArquivos(id);
     }
 
     function fecharModalRegistros() {
@@ -2126,18 +2141,45 @@ ${tf('venceLabel', {data: vencimentoFormatado, qtd: periodicidade})}
         colaboradorSelecionado = null;
     }
 
-    function abrirPastaDrive() {
-        if (!colaboradorSelecionado) {
-            alert(t('nenhumColaboradorSelecionado'));
-            return;
-        }
-        const link = (colaboradorSelecionado.driveLink || '').trim();
-        if (link && /^https?:\/\//i.test(link)) {
-            window.open(link, '_blank', 'noopener,noreferrer');
-        } else if (link) {
-            alert(t('semLinkDrive')); // link salvo não é http(s) válido — não abre
-        } else {
-            alert(t('semLinkDrive'));
+    // Busca e mostra a lista de arquivos já enviados, cada um com o link
+    // direto DELE (não da pasta) — assim quem clica abre só aquele
+    // arquivo, sem ganhar acesso à pasta inteira do Drive.
+    async function carregarListaArquivos(colaboradorId) {
+        const container = document.getElementById('listaArquivosRegistro');
+        container.innerHTML = `<span style="color:#6b7f94;">${t('carregandoArquivos')}</span>`;
+
+        try {
+            const resposta = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    acao: 'listarRegistrosColaborador',
+                    token: getTokenDaURL(),
+                    empresaId: empresaIdAtual,
+                    colaboradorId: colaboradorId
+                })
+            });
+            const resultado = await resposta.json();
+
+            if (!resultado.success) {
+                container.innerHTML = `<span style="color:#dc3545;">${resultado.error || t('erroCarregarArquivos')}</span>`;
+                return;
+            }
+
+            if (!resultado.arquivos || resultado.arquivos.length === 0) {
+                container.innerHTML = `<span style="color:#6b7f94;">${t('nenhumArquivoEnviado')}</span>`;
+                return;
+            }
+
+            container.innerHTML = resultado.arquivos.map(arq => `
+                <div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <a href="${arq.link}" target="_blank" rel="noopener noreferrer" style="color:#00b4d8; text-decoration:none; word-break:break-all;">
+                        📄 ${escapeHtml(arq.nome)}
+                    </a>
+                </div>
+            `).join('');
+        } catch (err) {
+            container.innerHTML = `<span style="color:#dc3545;">${t('erroCarregarArquivos')}</span>`;
         }
     }
 
@@ -2177,8 +2219,8 @@ ${tf('venceLabel', {data: vencimentoFormatado, qtd: periodicidade})}
                         const idx = colaboradores.findIndex(c => c.id === colaboradorSelecionado.id);
                         if (idx >= 0) colaboradores[idx].driveLink = resultado.pastaLink;
                         salvarNoLocalStorage();
-                        abrirRegistros(colaboradorSelecionado.id); // re-renderiza pra mostrar "Drive configurado"
                     }
+                    carregarListaArquivos(colaboradorSelecionado.id);
                     document.getElementById('inputRegistroArquivo').value = '';
                 } else {
                     status.style.color = '#dc3545';
@@ -2743,7 +2785,6 @@ ${tf('venceLabel', {data: vencimentoFormatado, qtd: periodicidade})}
     window.fecharModal = fecharModal;
     window.abrirRegistros = abrirRegistros;
     window.fecharModalRegistros = fecharModalRegistros;
-    window.abrirPastaDrive = abrirPastaDrive;
     window.exportarDados = exportarDados;
     window.importarDados = importarDados;
     window.limparFiltros = limparFiltros;
