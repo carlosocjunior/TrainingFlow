@@ -636,9 +636,6 @@
             </div>
         </div>
 
-        <label for="campoDrive" data-i18n="linkPastaDriveLabel">Link da Pasta Drive</label>
-        <input type="url" id="campoDrive" placeholder="https://drive.google.com/drive/folders/...">
-
         <div class="secao-treinamentos">
             <h4 data-i18n="treinamentosTitulo">Treinamentos</h4>
             <p style="color:#6b7f94; font-size:12px; margin-bottom:12px;" data-i18n="treinamentosInstrucao">
@@ -1919,7 +1916,6 @@
         document.getElementById('editandoId').value = '';
         document.getElementById('campoNome').value = '';
         document.getElementById('campoRegistro').value = '';
-        document.getElementById('campoDrive').value = '';
         document.getElementById('campoASO').value = '';
         document.getElementById('campoIRATA').value = '';
         document.getElementById('campoGWO').value = '';
@@ -1936,7 +1932,6 @@
         document.getElementById('editandoId').value = id;
         document.getElementById('campoNome').value = colab.nome || '';
         document.getElementById('campoRegistro').value = colab.registro || '';
-        document.getElementById('campoDrive').value = colab.driveLink || '';
         document.getElementById('campoASO').value = colab.treinamentos?.ASO || '';
         document.getElementById('campoIRATA').value = colab.treinamentos?.IRATA || '';
         document.getElementById('campoGWO').value = colab.treinamentos?.GWO || '';
@@ -1965,13 +1960,15 @@
             const id = document.getElementById('editandoId').value;
             const nome = document.getElementById('campoNome').value.trim();
             const registro = document.getElementById('campoRegistro').value.trim();
-            const driveLink = document.getElementById('campoDrive').value.trim();
+            // O link do Drive agora é preenchido automaticamente pelo upload —
+            // aqui só preservamos o que já estava salvo, sem campo pra digitar.
+            const colabExistente = id ? colaboradores.find(c => c.id === id) : null;
+            const driveLink = colabExistente?.driveLink || '';
 
             console.log('ID:', id, 'Nome:', nome, 'Registro:', registro);
 
             if (!nome) { alert(t('preencherNomeColaborador')); return; }
             if (!registro) { alert(t('preencherRegistro')); return; }
-            if (driveLink && !/^https?:\/\//i.test(driveLink)) { alert(t('linkDriveInvalido')); return; }
 
             const asoAtual = document.getElementById('campoASO').value || '';
             const irataAtual = document.getElementById('campoIRATA').value || '';
